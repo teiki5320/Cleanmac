@@ -6,3 +6,5 @@ xcuserdata/
 *.xcscmblueprint
 .swiftpm/
 .build/
+*.xcresult
+*.dSYM/

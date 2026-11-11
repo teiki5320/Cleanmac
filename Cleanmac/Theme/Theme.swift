@@ -125,7 +125,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .analyse: "Analyse en un clic"
+        case .analyse: "Analyse complète"
         case .systeme: "Fichiers système"
         case .developpeur: "Développeur"
         case .mail: "Mail"
@@ -174,7 +174,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
     var summary: String {
         switch self {
         case .analyse:
-            "Passe en revue les modules disponibles et prépare un nettoyage. Rien ne part sans votre vérification."
+            "Parcourt toutes les règles d'un coup : fichiers système et outils de développement, y compris les éléments « à vérifier ». Rien ne part sans votre vérification."
         case .systeme:
             "Caches des applications, journaux, rapports de plantage et états de fenêtres enregistrés."
         case .developpeur:
@@ -195,9 +195,9 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
     var features: [ModuleFeature] {
         switch self {
         case .analyse:
-            [.init(title: "Fichiers système inutiles", symbol: "doc.text"),
-             .init(title: "Caches de développement", symbol: "hammer"),
-             .init(title: "Tout passe par la Corbeille", symbol: "arrow.uturn.backward")]
+            [.init(title: "Tous les fichiers système", symbol: "doc.text"),
+             .init(title: "Tout le développement", symbol: "hammer"),
+             .init(title: "Vérification avant nettoyage", symbol: "checkmark.shield")]
         case .systeme:
             [.init(title: "Caches des applications", symbol: "internaldrive"),
              .init(title: "Journaux et plantages", symbol: "list.bullet.rectangle"),
@@ -254,7 +254,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
     /// Petite ligne sous l'objet en verre.
     var caption: String {
         switch self {
-        case .analyse: "Modules disponibles uniquement"
+        case .analyse: "Toutes les règles, en une seule analyse"
         case .systeme, .developpeur: "Les éléments « sûrs » sont cochés d'office"
         case .mail, .corbeilles, .icloud: "Module à venir"
         case .carte: "Module à venir"

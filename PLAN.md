@@ -36,7 +36,7 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
         vérification et écran « terminé » au style verre (aujourd'hui une feuille simple)
 
 ## Phase 2 — Modules de nettoyage
-- [ ] **Analyse en un clic** : lance les modules sûrs, résume, nettoie après validation
+- [ ] **Analyse complète** : parcourt toutes les règles, résume, nettoie après validation
 - [ ] **Fichiers système inutiles** : caches utilisateur, logs, fichiers temporaires,
       caches d'applis connues, rapports de plantage
 - [x] **Développeur** : Xcode (DerivedData, Archives, iOS DeviceSupport, simulateurs via `xcrun simctl`),
@@ -119,9 +119,12 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   Couleurs et objets définis dans `Theme.swift` ; aucun élément repris de CleanMyMac.
 - Animations continues pilotées par `AnimationClock` (TimelineView) : tout est figé si
   « Réduire les animations » est activé.
-- Le scan peut être limité à des catégories (`startScan(categories:)`) : « Analyse en un clic » parcourt
+- Le scan peut être limité à des catégories (`startScan(categories:)`) : « Analyse complète » parcourt
   toutes les règles, « Fichiers système » et « Développeur » seulement les leurs. Les modules pas encore
   construits sont visibles avec la mention « bientôt » et un bouton désactivé.
 - L'ancien écran de contrôle (accès au disque, outil d'aide, règles, réglages, journal) reste accessible
   par « Réglages et journal » en bas de la barre latérale (⌘,).
 - Version 0.3.0 (build 3).
+- Le premier module s'appelle « Analyse complète » (et non plus « Analyse en un clic ») : il parcourt
+  toutes les règles, y compris les éléments « à vérifier », ce que l'ancien nom ne disait pas.
+- Version 0.3.1 (build 4).

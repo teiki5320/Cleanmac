@@ -49,6 +49,10 @@ public enum RuleCategory: String, Codable, Sendable, CaseIterable {
 ///   Jokers autorisés dans les composants : `*`, `?`, `[…]`.
 /// - `regenerable` : caches recréés automatiquement. Seuls ces éléments peuvent être
 ///   supprimés définitivement, et seulement si l'utilisateur l'a activé.
+/// - `source` (facultatif) : les éléments ne sont pas des chemins mais sont listés et supprimés
+///   par un outil du système (ex. `simulatorRuntimes` via `xcrun simctl`). `paths` est alors vide.
+///   Ces éléments ne peuvent pas aller à la Corbeille : ils exigent donc une règle `regenerable`
+///   et la suppression définitive activée par l'utilisateur.
 public struct Rule: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let name: String
@@ -58,6 +62,7 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
     public let paths: [String]
     public let excludes: [String]
     public let regenerable: Bool
+    public let source: RuleSource?
 
     public init(
         id: String,
@@ -67,7 +72,8 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
         explanation: String,
         paths: [String],
         excludes: [String] = [],
-        regenerable: Bool = false
+        regenerable: Bool = false,
+        source: RuleSource? = nil
     ) {
         self.id = id
         self.name = name
@@ -77,10 +83,11 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
         self.paths = paths
         self.excludes = excludes
         self.regenerable = regenerable
+        self.source = source
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, risk, explanation, paths, excludes, regenerable
+        case id, name, category, risk, explanation, paths, excludes, regenerable, source
     }
 
     public init(from decoder: Decoder) throws {
@@ -93,10 +100,17 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
         paths = try c.decode([String].self, forKey: .paths)
         excludes = try c.decodeIfPresent([String].self, forKey: .excludes) ?? []
         regenerable = try c.decodeIfPresent(Bool.self, forKey: .regenerable) ?? false
+        source = try c.decodeIfPresent(RuleSource.self, forKey: .source)
     }
 
     /// Un élément est coché par défaut seulement si la règle est « sûre ».
     public var isSelectedByDefault: Bool { risk == .safe }
+}
+
+/// Outils du système qui listent et suppriment eux-mêmes certains éléments.
+public enum RuleSource: String, Codable, Sendable, CaseIterable {
+    /// Systèmes des simulateurs, gérés par `xcrun simctl runtime`.
+    case simulatorRuntimes
 }
 
 /// Contenu d'un fichier `Rules/*.json`.

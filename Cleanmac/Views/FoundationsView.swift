@@ -14,7 +14,9 @@ struct FoundationsView: View {
                 accessCard
                 helperCard
                 rulesCard
+                settingsCard
                 scanCard
+                journalCard
             }
             .padding(28)
             .frame(maxWidth: 900, alignment: .leading)
@@ -25,9 +27,9 @@ struct FoundationsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Cleanmac — fondations")
+            Text("Cleanmac")
                 .font(.largeTitle.bold())
-            Text("Version \(appVersion). Écran de contrôle provisoire : le scan est en lecture seule, rien n'est supprimé.")
+            Text("Version \(appVersion). Écran provisoire, en attendant le design de la Phase 1. Rien n'est supprimé sans passer par l'écran de vérification.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
         }
@@ -108,13 +110,13 @@ struct FoundationsView: View {
     // MARK: Scan
 
     private var scanCard: some View {
-        Card(title: "Scan (lecture seule)", symbol: "magnifyingglass") {
+        Card(title: "Analyse et nettoyage", symbol: "magnifyingglass") {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     if model.isScanning {
                         Button("Annuler", role: .cancel) { model.cancelScan() }
                     } else {
-                        Button("Lancer le scan") { model.startScan() }
+                        Button(model.scanResult == nil ? "Lancer l'analyse" : "Relancer l'analyse") { model.startScan() }
                             .keyboardShortcut(.defaultAction)
                             .disabled(model.rules == nil)
                     }
@@ -144,62 +146,52 @@ struct FoundationsView: View {
         case let .failed(message):
             Text("Erreur : \(message)").foregroundStyle(.red)
         case let .finished(result):
-            ScanResultList(result: result, rules: model.rules)
+            ResultsView(result: result)
         }
     }
 
-    private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    // MARK: Réglages
+
+    private var settingsCard: some View {
+        @Bindable var model = model
+        return Card(title: "Réglages", symbol: "gearshape") {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(isOn: $model.allowPermanentDeletion) {
+                    Text("Supprimer définitivement les caches régénérables").font(.title3)
+                }
+                .toggleStyle(.switch)
+                Text("Désactivé : tout va à la Corbeille. Activé : les caches que les applis recréent seules sont supprimés tout de suite (l'espace est libéré immédiatement), ainsi que les systèmes de simulateurs, retéléchargeables depuis Xcode. Le reste va toujours à la Corbeille.")
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
-}
 
-/// Résultats regroupés par règle (aperçu, sans nettoyage).
-struct ScanResultList: View {
-    let result: ScanResult
-    let rules: RuleBook?
+    // MARK: Journal
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("\(Bytes.text(result.totalBytes)) trouvés, dont \(Bytes.text(result.selectedByDefaultBytes)) cochés par défaut")
-                .font(.title2.bold())
-            Text("\(result.items.count) éléments, \(result.skipped.count) protégés, \(result.unreadableCount) illisibles — \(result.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated)))")
-                .foregroundStyle(.secondary)
-
-            ForEach(rules?.rules ?? []) { rule in
-                let items = result.items(forRule: rule.id)
-                if !items.isEmpty {
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(items.sorted { $0.allocatedBytes > $1.allocatedBytes }.prefix(50)) { item in
-                                HStack {
-                                    Image(systemName: item.isSelectedByDefault ? "checkmark.square.fill" : "square")
-                                        .foregroundStyle(item.isSelectedByDefault ? Color.accentColor : .secondary)
-                                    Text(item.name).lineLimit(1).truncationMode(.middle)
-                                    Spacer()
-                                    Text(Bytes.text(item.allocatedBytes)).monospacedDigit()
-                                }
-                                .help(item.path)
-                            }
-                            if items.count > 50 {
-                                Text("… et \(items.count - 50) autres").foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    } label: {
+    private var journalCard: some View {
+        Card(title: "Journal des nettoyages", symbol: "clock.arrow.circlepath") {
+            if model.journalEntries.isEmpty {
+                Text("Aucun nettoyage pour l'instant.").foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Total libéré : \(Bytes.text(model.journalEntries.reduce(0) { $0 + $1.freedBytes }))")
+                        .font(.title3.weight(.semibold))
+                    ForEach(model.journalEntries.reversed().prefix(10)) { entry in
                         HStack {
-                            Text(rule.name).font(.title3)
-                            Text(rule.risk.label)
-                                .font(.callout)
-                                .padding(.horizontal, 8).padding(.vertical, 2)
-                                .background(Capsule().fill(rule.risk == .safe ? Color.green.opacity(0.2) : Color.orange.opacity(0.2)))
+                            Text(entry.date.formatted(date: .abbreviated, time: .shortened))
                             Spacer()
-                            Text(Bytes.text(items.reduce(0) { $0 + $1.allocatedBytes }))
-                                .font(.title3.monospacedDigit())
+                            Text("\(entry.items.filter(\.succeeded).count) éléments")
+                                .foregroundStyle(.secondary)
+                            Text(Bytes.text(entry.freedBytes)).monospacedDigit()
                         }
                     }
                 }
             }
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }
 }
 

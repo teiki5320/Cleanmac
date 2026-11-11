@@ -17,6 +17,11 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - [x] Moteur de nettoyage : Corbeille par défaut, journal, exclusions
       (testé avec un faux suppresseur ; pas encore branché à l'interface)
 
+## En avance sur le plan (0.2.0)
+- [x] Cases à cocher, écran de vérification (total, Corbeille / définitif), nettoyage, résultat,
+      journal et réglage « suppression définitive des caches régénérables » — dans l'écran provisoire,
+      à reprendre au design de la Phase 1. Testé par les tests unitaires ; reste à valider à l'écran.
+
 ## Phase 1 — Design
 - [ ] Fichier de thème : couleurs, dégradés par module, typographie, espacements
 - [ ] Fenêtre principale : barre latérale translucide + zone de contenu
@@ -28,9 +33,12 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - [ ] **Analyse en un clic** : lance les modules sûrs, résume, nettoie après validation
 - [ ] **Fichiers système inutiles** : caches utilisateur, logs, fichiers temporaires,
       caches d'applis connues, rapports de plantage
-- [ ] **Développeur** : Xcode (DerivedData, Archives, iOS DeviceSupport, simulateurs via `xcrun simctl`),
+- [x] **Développeur** : Xcode (DerivedData, Archives, iOS DeviceSupport, simulateurs via `xcrun simctl`),
       Gradle, `.pub-cache` / Flutter, npm / pnpm / yarn, Homebrew (`brew cleanup`), CocoaPods, pip ;
       modèles Ollama et ComfyUI affichés mais jamais cochés par défaut
+      → fait en avance (0.2.0), avec en plus : copies des appareils (CoreDevice), SDK Android,
+        caches et machine virtuelle de Claude. Homebrew : cache des téléchargements au lieu de `brew cleanup`.
+        Reste : simulateurs « indisponibles » (`xcrun simctl delete unavailable`, aucun sur ce Mac).
 - [ ] **Mail** : pièces jointes téléchargées de Mail et caches de Thunderbird
 - [ ] **Corbeilles** : Corbeille système, corbeilles des volumes externes, corbeille de Photos
 - [ ] **iCloud Drive** : repérer les fichiers téléchargés en local et les libérer (`brctl evict`)
@@ -89,3 +97,13 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - Phase 0 : l'écran principal est un écran de contrôle provisoire (scan en lecture seule, aucun bouton
   de nettoyage tant que l'écran de vérification de la Phase 1 n'existe pas).
 - Version 0.1.0 (build 1) : première livraison testable.
+- Module Développeur avancé avant la Phase 1 à la demande de l'utilisateur (le disque est plein,
+  c'est là que se trouve la place). Scan réel : 44 Go repérés, dont 0,7 Go « sûr » coché d'office.
+- Règles à source (`"source"` dans le JSON) pour les éléments gérés par un outil du système
+  (systèmes de simulateurs via `xcrun simctl runtime`). Ils ne peuvent pas aller à la Corbeille :
+  la règle doit être régénérable et ils ne sont supprimables que si la suppression définitive est
+  activée. L'élément est revérifié dans la liste de l'outil juste avant sa suppression.
+- Les règles Développeur passent avant les caches génériques (fichiers chargés par ordre alphabétique,
+  le premier qui revendique un chemin le garde) : `~/Library/Caches/pip` est classé dans « Python ».
+- Caches et machine virtuelle de Claude : « à vérifier », car Claude est souvent ouvert pendant l'analyse.
+- Version 0.2.0 (build 2).

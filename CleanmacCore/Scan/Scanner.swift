@@ -3,13 +3,20 @@ import Foundation
 /// Un élément trouvé par le scan, rattaché à la règle qui l'autorise.
 public struct ScanItem: Sendable, Identifiable, Hashable {
     public var id: String { path }
+    /// Chemin sur le disque, ou référence `source:identifiant` pour un élément externe.
     public let path: String
     public let ruleID: String
     public let allocatedBytes: Int64
     public let fileCount: Int
     public let isSelectedByDefault: Bool
+    /// Nom affiché (éléments externes) ; sinon le dernier composant du chemin.
+    public var displayName: String?
+    /// Précision affichée sous le nom (ex. date de dernière utilisation).
+    public var detail: String?
+    /// Vrai si l'élément est géré par un outil du système (pas un chemin).
+    public var isExternal = false
 
-    public var name: String { (path as NSString).lastPathComponent }
+    public var name: String { displayName ?? (path as NSString).lastPathComponent }
 }
 
 /// Un élément écarté par les protections.
@@ -41,6 +48,8 @@ public struct ScanResult: Sendable {
     public let skipped: [SkippedItem]
     public let unreadableCount: Int
     public let duration: Duration
+    /// Messages des sources externes qui n'ont pas pu être interrogées.
+    public var sourceErrors: [String] = []
 
     public var totalBytes: Int64 { items.reduce(0) { $0 + $1.allocatedBytes } }
     public var selectedByDefaultBytes: Int64 {
@@ -50,17 +59,26 @@ public struct ScanResult: Sendable {
     public func items(forRule id: String) -> [ScanItem] {
         items.filter { $0.ruleID == id }
     }
+
+    /// Résultat sans les éléments déjà nettoyés.
+    public func removing(_ paths: Set<String>) -> ScanResult {
+        ScanResult(
+            items: items.filter { !paths.contains($0.path) }, skipped: skipped,
+            unreadableCount: unreadableCount, duration: duration, sourceErrors: sourceErrors)
+    }
 }
 
 /// Moteur de scan : lecture seule, asynchrone, annulable, avec progression.
 public struct Scanner: Sendable {
     public let policy: ProtectionPolicy
     public let pattern: PathPattern
+    public let sources: [RuleSource: any ExternalSource]
     public var calculator = SizeCalculator()
 
-    public init(policy: ProtectionPolicy) {
+    public init(policy: ProtectionPolicy, sources: [RuleSource: any ExternalSource] = ExternalSources.system) {
         self.policy = policy
         self.pattern = PathPattern(home: policy.home)
+        self.sources = sources
     }
 
     /// Parcourt les règles et mesure chaque élément trouvé.
@@ -75,6 +93,7 @@ public struct Scanner: Sendable {
         var items: [ScanItem] = []
         var skipped: [SkippedItem] = []
         var unreadable = 0
+        var sourceErrors: [String] = []
         var claimed: [String] = []   // chemins déjà retenus (évite les doublons entre règles)
         var state = ScanProgress(
             ruleIndex: 0, ruleCount: rules.count, currentRuleName: "",
@@ -85,6 +104,32 @@ public struct Scanner: Sendable {
             state.ruleIndex = index
             state.currentRuleName = rule.name
             progress?(state)
+
+            if let source = rule.source {
+                guard let provider = sources[source] else { continue }
+                do {
+                    for external in try await provider.list() {
+                        var item = ScanItem(
+                            path: ExternalReference.make(source: source, id: external.id),
+                            ruleID: rule.id,
+                            allocatedBytes: external.bytes,
+                            fileCount: 0,
+                            isSelectedByDefault: rule.isSelectedByDefault)
+                        item.displayName = external.name
+                        item.detail = external.detail
+                        item.isExternal = true
+                        items.append(item)
+                        state.bytesFound += external.bytes
+                    }
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    sourceErrors.append("\(rule.name) : \(error.localizedDescription)")
+                }
+                state.itemsFound = items.count
+                progress?(state)
+                continue
+            }
 
             for path in pattern.expand(rule: rule) {
                 try Task.checkCancellation()
@@ -126,6 +171,6 @@ public struct Scanner: Sendable {
         progress?(state)
         return ScanResult(
             items: items, skipped: skipped, unreadableCount: unreadable,
-            duration: clock.now - start)
+            duration: clock.now - start, sourceErrors: sourceErrors)
     }
 }

@@ -5,6 +5,7 @@ public enum RuleError: Error, Equatable, LocalizedError {
     case unreadable(file: String, reason: String)
     case duplicateID(String)
     case emptyPaths(ruleID: String)
+    case invalidSource(ruleID: String, reason: String)
     case invalidPath(ruleID: String, path: String, reason: String)
     case noRuleFiles
 
@@ -16,6 +17,8 @@ public enum RuleError: Error, Equatable, LocalizedError {
             "Identifiant de règle en double : \(id)"
         case let .emptyPaths(id):
             "La règle \(id) ne déclare aucun chemin."
+        case let .invalidSource(id, reason):
+            "Règle \(id) : \(reason)"
         case let .invalidPath(id, path, reason):
             "Chemin refusé dans la règle \(id) (\(path)) : \(reason)"
         case .noRuleFiles:
@@ -83,6 +86,15 @@ public struct RuleBook: Sendable {
         var seen = Set<String>()
         for rule in rules {
             guard seen.insert(rule.id).inserted else { throw RuleError.duplicateID(rule.id) }
+            if rule.source != nil {
+                guard rule.paths.isEmpty, rule.excludes.isEmpty else {
+                    throw RuleError.invalidSource(ruleID: rule.id, reason: "une règle à source ne déclare pas de chemins")
+                }
+                guard rule.regenerable else {
+                    throw RuleError.invalidSource(ruleID: rule.id, reason: "une règle à source doit être régénérable")
+                }
+                continue
+            }
             guard !rule.paths.isEmpty else { throw RuleError.emptyPaths(ruleID: rule.id) }
             for path in rule.paths + rule.excludes {
                 if let reason = PathPattern.problem(with: path) {

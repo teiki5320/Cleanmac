@@ -46,6 +46,8 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
     case notMatchingRule(ruleID: String)
     case protected(ProtectionReason)
     case missing
+    case permanentDeletionDisabled
+    case sourceUnavailable
 
     public var description: String {
         switch self {
@@ -53,6 +55,9 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
         case let .notMatchingRule(id): "Hors de la règle \(id)"
         case let .protected(reason): reason.description
         case .missing: "Élément introuvable"
+        case .permanentDeletionDisabled:
+            "Ne peut pas aller à la Corbeille : activez la suppression définitive dans les réglages"
+        case .sourceUnavailable: "Outil du système indisponible"
         }
     }
 }
@@ -64,6 +69,7 @@ public struct Cleaner: Sendable {
     public let policy: ProtectionPolicy
     public let remover: any FileRemoving
     public let journal: CleanJournal
+    public let sources: [RuleSource: any ExternalSource]
     /// Suppression définitive autorisée par l'utilisateur (caches régénérables uniquement).
     public let allowPermanentDeletion: Bool
 
@@ -72,18 +78,26 @@ public struct Cleaner: Sendable {
         policy: ProtectionPolicy,
         remover: any FileRemoving = SystemFileRemover(),
         journal: CleanJournal = CleanJournal(),
+        sources: [RuleSource: any ExternalSource] = ExternalSources.system,
         allowPermanentDeletion: Bool = false
     ) {
         self.rules = rules
         self.policy = policy
         self.remover = remover
         self.journal = journal
+        self.sources = sources
         self.allowPermanentDeletion = allowPermanentDeletion
     }
 
     /// Méthode de suppression appliquée à une règle.
     public func method(for rule: Rule) -> RemovalMethod {
-        allowPermanentDeletion && rule.regenerable ? .permanent : .trash
+        if rule.source != nil { return .permanent }
+        return allowPermanentDeletion && rule.regenerable ? .permanent : .trash
+    }
+
+    /// Les éléments de cette règle peuvent-ils être nettoyés avec les réglages actuels ?
+    public func canClean(_ rule: Rule) -> Bool {
+        rule.source == nil || (allowPermanentDeletion && rule.regenerable)
     }
 
     /// Vérifie qu'un élément peut être supprimé. Renvoie la règle qui l'autorise.
@@ -91,6 +105,7 @@ public struct Cleaner: Sendable {
         guard let rule = rules.rule(id: request.ruleID) else {
             throw .unknownRule(request.ruleID)
         }
+        guard rule.source == nil else { throw .notMatchingRule(ruleID: rule.id) }
         let pattern = PathPattern(home: policy.home)
         guard pattern.matches(request.path, rule: rule) else {
             throw .notMatchingRule(ruleID: rule.id)
@@ -112,6 +127,10 @@ public struct Cleaner: Sendable {
         for (index, request) in requests.enumerated() {
             if Task.isCancelled { break }
             progress?(index, requests.count)
+            if let rule = rules.rule(id: request.ruleID), let source = rule.source {
+                lines.append(await cleanExternal(request, rule: rule, source: source))
+                continue
+            }
             do {
                 let rule = try validate(request)
                 let method = method(for: rule)
@@ -132,8 +151,37 @@ public struct Cleaner: Sendable {
             }
         }
         progress?(requests.count, requests.count)
+        guard !lines.isEmpty else {
+            return JournalEntry(id: UUID(), date: Date(), items: [])
+        }
         let entry = JournalEntry(id: UUID(), date: Date(), items: lines)
         try journal.append(entry)
         return entry
+    }
+
+    /// Supprime un élément géré par un outil du système, après revérification.
+    private func cleanExternal(_ request: CleanRequest, rule: Rule, source: RuleSource) async -> JournalItem {
+        func failure(_ message: String) -> JournalItem {
+            JournalItem(
+                path: request.path, ruleID: request.ruleID, bytes: request.bytes,
+                method: .permanent, succeeded: false, message: message, trashedPath: nil)
+        }
+        guard canClean(rule) else { return failure(CleanRefusal.permanentDeletionDisabled.description) }
+        guard let id = ExternalReference.parse(request.path, source: source),
+              let provider = sources[source] else {
+            return failure(CleanRefusal.sourceUnavailable.description)
+        }
+        do {
+            // L'élément doit toujours figurer dans la liste de l'outil.
+            guard try await provider.list().contains(where: { $0.id == id }) else {
+                return failure(CleanRefusal.missing.description)
+            }
+            try await provider.delete(id: id)
+            return JournalItem(
+                path: request.path, ruleID: request.ruleID, bytes: request.bytes,
+                method: .permanent, succeeded: true, message: nil, trashedPath: nil)
+        } catch {
+            return failure(error.localizedDescription)
+        }
     }
 }

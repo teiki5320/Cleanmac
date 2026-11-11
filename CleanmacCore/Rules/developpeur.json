@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "dev.xcode-deriveddata",
+      "name": "Xcode : données dérivées",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Fichiers de compilation et index de Xcode. Recréés à la prochaine compilation (la première sera plus longue).",
+      "paths": ["~/Library/Developer/Xcode/DerivedData/*"]
+    },
+    {
+      "id": "dev.xcode-previews",
+      "name": "Xcode : aperçus SwiftUI",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Données des aperçus SwiftUI. Recréées à la prochaine ouverture d'un aperçu.",
+      "paths": ["~/Library/Developer/Xcode/UserData/Previews/*"]
+    },
+    {
+      "id": "dev.xcode-devicesupport",
+      "name": "Xcode : prise en charge des appareils",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Symboles copiés depuis vos iPhone, iPad, montres ou Mac pour le débogage. Recopiés automatiquement au prochain branchement de l'appareil.",
+      "paths": [
+        "~/Library/Developer/Xcode/iOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/watchOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/tvOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/visionOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/macOS DeviceSupport/*"
+      ]
+    },
+    {
+      "id": "dev.coredevice-devicefs",
+      "name": "Xcode : copies des appareils branchés",
+      "category": "developer",
+      "risk": "review",
+      "regenerable": true,
+      "explanation": "Copie locale des bibliothèques système d'un iPhone ou iPad, utilisée pour lancer et déboguer vos applis dessus. Recréée au prochain branchement, ce qui peut prendre plusieurs minutes.",
+      "paths": ["~/Library/Developer/CoreDevice/DeviceFS/*"]
+    },
+    {
+      "id": "dev.xcode-archives",
+      "name": "Xcode : archives",
+      "category": "developer",
+      "risk": "review",
+      "explanation": "Versions de vos applis archivées pour l'App Store. Elles contiennent les symboles utiles pour lire les rapports de plantage des versions publiées.",
+      "paths": ["~/Library/Developer/Xcode/Archives/*"]
+    },
+    {
+      "id": "dev.simulateurs-caches",
+      "name": "Simulateurs : caches",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Caches des simulateurs iOS. Recréés au besoin.",
+      "paths": ["~/Library/Developer/CoreSimulator/Caches/*"]
+    },
+    {
+      "id": "dev.simulateurs-runtimes",
+      "name": "Simulateurs : systèmes installés",
+      "category": "developer",
+      "risk": "review",
+      "regenerable": true,
+      "source": "simulatorRuntimes",
+      "explanation": "Systèmes iOS téléchargés pour les simulateurs (plusieurs Go chacun). Retéléchargeables depuis Xcode › Réglages › Composants. Supprimés via Xcode, sans passer par la Corbeille.",
+      "paths": []
+    },
+    {
+      "id": "dev.gradle-caches",
+      "name": "Gradle : caches",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Dépendances et résultats de compilation Gradle (Android). Retéléchargés à la prochaine compilation.",
+      "paths": ["~/.gradle/caches/*", "~/.gradle/daemon/*", "~/.gradle/native/*"]
+    },
+    {
+      "id": "dev.gradle-wrapper",
+      "name": "Gradle : versions téléchargées",
+      "category": "developer",
+      "risk": "review",
+      "regenerable": true,
+      "explanation": "Distributions de Gradle téléchargées par vos projets. Retéléchargées si un projet en a besoin.",
+      "paths": ["~/.gradle/wrapper/dists/*"]
+    },
+    {
+      "id": "dev.android-cache",
+      "name": "Android : caches",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Caches des outils Android. Recréés au besoin.",
+      "paths": ["~/.android/cache/*"]
+    },
+    {
+      "id": "dev.android-sdk-outils",
+      "name": "Android : outils du SDK",
+      "category": "developer",
+      "risk": "review",
+      "explanation": "Versions du NDK et des outils de compilation Android. Les anciennes versions sont souvent inutiles, mais un projet peut en exiger une précise (réinstallable depuis Android Studio).",
+      "paths": [
+        "~/Library/Android/sdk/ndk/*",
+        "~/Library/Android/sdk/build-tools/*",
+        "~/Library/Android/sdk/system-images/*"
+      ]
+    },
+    {
+      "id": "dev.android-emulateurs",
+      "name": "Android : émulateurs",
+      "category": "developer",
+      "risk": "review",
+      "explanation": "Appareils virtuels Android et leurs données.",
+      "paths": ["~/.android/avd/*"]
+    },
+    {
+      "id": "dev.flutter-pub",
+      "name": "Flutter / Dart : paquets téléchargés",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Paquets Dart téléchargés. Retéléchargés par « flutter pub get ».",
+      "paths": ["~/.pub-cache/hosted/*", "~/.pub-cache/_temp/*"]
+    },
+    {
+      "id": "dev.dart-analyse",
+      "name": "Dart : cache d'analyse",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Cache de l'analyseur Dart utilisé par les éditeurs. Recréé automatiquement.",
+      "paths": ["~/.dartServer/*"]
+    },
+    {
+      "id": "dev.npm",
+      "name": "npm : cache",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Paquets npm déjà téléchargés. Retéléchargés au besoin.",
+      "paths": ["~/.npm/_cacache", "~/.npm/_npx", "~/.npm/_logs"]
+    },
+    {
+      "id": "dev.pnpm-yarn",
+      "name": "pnpm / Yarn : caches",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Paquets JavaScript déjà téléchargés. Retéléchargés au besoin.",
+      "paths": [
+        "~/Library/Caches/pnpm",
+        "~/Library/pnpm/store/*",
+        "~/Library/Caches/Yarn",
+        "~/.yarn/berry/cache/*"
+      ]
+    },
+    {
+      "id": "dev.cocoapods",
+      "name": "CocoaPods : cache",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Pods déjà téléchargés. Retéléchargés par « pod install ».",
+      "paths": ["~/Library/Caches/CocoaPods"]
+    },
+    {
+      "id": "dev.pip",
+      "name": "Python (pip) : cache",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Paquets Python déjà téléchargés. Retéléchargés au besoin.",
+      "paths": ["~/Library/Caches/pip", "~/.cache/pip"]
+    },
+    {
+      "id": "dev.homebrew",
+      "name": "Homebrew : téléchargements",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Archives des logiciels installés avec Homebrew. Inutiles une fois l'installation faite.",
+      "paths": ["~/Library/Caches/Homebrew/*"]
+    },
+    {
+      "id": "dev.claude-caches",
+      "name": "Claude : caches",
+      "category": "developer",
+      "risk": "review",
+      "regenerable": true,
+      "explanation": "Caches web de l'appli Claude. Recréés automatiquement. Quittez Claude avant de nettoyer pour un résultat complet.",
+      "paths": [
+        "~/Library/Application Support/Claude/Cache",
+        "~/Library/Application Support/Claude/Code Cache",
+        "~/Library/Application Support/Claude/GPUCache",
+        "~/Library/Application Support/Claude/DawnGraphiteCache",
+        "~/Library/Application Support/Claude/DawnWebGPUCache",
+        "~/Library/Application Support/Claude/GraphiteDawnCache"
+      ]
+    },
+    {
+      "id": "dev.claude-vm",
+      "name": "Claude : machine virtuelle",
+      "category": "developer",
+      "risk": "review",
+      "regenerable": true,
+      "explanation": "Image de la machine virtuelle utilisée par Claude pour exécuter des tâches. Retéléchargée la prochaine fois qu'elle sert (plusieurs Go). Quittez Claude avant de la supprimer.",
+      "paths": ["~/Library/Application Support/Claude/vm_bundles/*"]
+    },
+    {
+      "id": "dev.ollama-modeles",
+      "name": "Ollama : modèles",
+      "category": "developer",
+      "risk": "review",
+      "explanation": "Modèles d'IA téléchargés pour Ollama. Les supprimer oblige à les retélécharger (souvent plusieurs Go).",
+      "paths": ["~/.ollama/models/*"]
+    },
+    {
+      "id": "dev.comfyui-modeles",
+      "name": "ComfyUI : modèles",
+      "category": "developer",
+      "risk": "review",
+      "explanation": "Modèles d'image téléchargés pour ComfyUI. Les supprimer oblige à les retélécharger.",
+      "paths": [
+        "~/Library/Application Support/ComfyUI/models/*",
+        "~/ComfyUI/models/*"
+      ]
+    }
+  ]
+}

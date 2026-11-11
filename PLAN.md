@@ -23,11 +23,17 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
       à reprendre au design de la Phase 1. Testé par les tests unitaires ; reste à valider à l'écran.
 
 ## Phase 1 — Design
+- [x] Maquette validée par l'utilisateur : style « verre » (maquette n°10 de la toile
+      « Cleanmac — pistes de design »), pour tous les modules
 - [ ] Fichier de thème : couleurs, dégradés par module, typographie, espacements
+      → codé (`Cleanmac/Theme/Theme.swift`, 0.3.0) ; reste à compiler et valider à l'écran
 - [ ] Fenêtre principale : barre latérale translucide + zone de contenu
+      → codé (`Cleanmac/Views/Glass/MainWindowView.swift`) ; reste à valider à l'écran
 - [ ] Composants : gros bouton de scan animé, anneau de progression, cartes de résultat,
       liste détaillée avec cases à cocher, écran « terminé » avec espace libéré
-- [ ] Maquette validée par l'utilisateur avant d'aller plus loin
+      → bouton rond, anneau, objets en verre animés et fond animé codés ; les résultats
+        reprennent la liste à cases à cocher dans un panneau en verre. Restent : écran de
+        vérification et écran « terminé » au style verre (aujourd'hui une feuille simple)
 
 ## Phase 2 — Modules de nettoyage
 - [ ] **Analyse en un clic** : lance les modules sûrs, résume, nettoie après validation
@@ -107,3 +113,15 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   le premier qui revendique un chemin le garde) : `~/Library/Caches/pip` est classé dans « Python ».
 - Caches et machine virtuelle de Claude : « à vérifier », car Claude est souvent ouvert pendant l'analyse.
 - Version 0.2.0 (build 2).
+- Phase 1, style « verre » : fond en dégradé animé propre à chaque module sur toute la fenêtre,
+  barre latérale translucide, gros objet en verre animé (sphère, bloc, poubelle, anneaux du disque),
+  titre + trois fonctions à droite, bouton rond flottant en bas (Analyser / Arrêter / Relancer).
+  Couleurs et objets définis dans `Theme.swift` ; aucun élément repris de CleanMyMac.
+- Animations continues pilotées par `AnimationClock` (TimelineView) : tout est figé si
+  « Réduire les animations » est activé.
+- Le scan peut être limité à des catégories (`startScan(categories:)`) : « Analyse en un clic » parcourt
+  toutes les règles, « Fichiers système » et « Développeur » seulement les leurs. Les modules pas encore
+  construits sont visibles avec la mention « bientôt » et un bouton désactivé.
+- L'ancien écran de contrôle (accès au disque, outil d'aide, règles, réglages, journal) reste accessible
+  par « Réglages et journal » en bas de la barre latérale (⌘,).
+- Version 0.3.0 (build 3).

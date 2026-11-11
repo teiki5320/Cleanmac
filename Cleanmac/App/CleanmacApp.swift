@@ -8,13 +8,14 @@ struct CleanmacApp: App {
         WindowGroup("Cleanmac") {
             RootView()
                 .environment(model)
-                .frame(minWidth: 820, minHeight: 600)
+                .frame(minWidth: 960, minHeight: 680)
         }
-        .defaultSize(width: 980, height: 720)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1280, height: 820)
     }
 }
 
-/// Écran d'accueil au premier lancement, puis écran principal.
+/// Écran d'accueil au premier lancement, puis fenêtre principale en style verre.
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("accueilTermine") private var onboardingDone = false
@@ -22,7 +23,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if onboardingDone {
-                FoundationsView()
+                MainWindowView()
             } else {
                 OnboardingView { onboardingDone = true }
             }

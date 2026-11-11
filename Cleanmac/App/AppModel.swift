@@ -75,16 +75,21 @@ final class AppModel {
         return nil
     }
 
-    /// Lance un scan en lecture seule de toutes les règles.
-    func startScan() {
+    /// Catégories du dernier scan lancé (`nil` : toutes les règles).
+    private(set) var scanCategories: Set<RuleCategory>?
+
+    /// Lance un scan en lecture seule, de toutes les règles ou des seules catégories demandées.
+    func startScan(categories: Set<RuleCategory>? = nil) {
         guard let rules, !isScanning else { return }
+        let selectedRules = categories.map { wanted in rules.rules.filter { wanted.contains($0.category) } } ?? rules.rules
         exclusions = ExclusionStore().load()
         let policy = ProtectionPolicy(userExclusions: exclusions)
+        scanCategories = categories
         scanState = .scanning(nil)
         cleanState = .idle
         scanTask = Task {
             do {
-                let result = try await Scanner(policy: policy).scan(rules: rules.rules) { progress in
+                let result = try await Scanner(policy: policy).scan(rules: selectedRules) { progress in
                     Task { @MainActor in
                         guard self.isScanning else { return }
                         self.scanState = .scanning(progress)

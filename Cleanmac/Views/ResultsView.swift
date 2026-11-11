@@ -81,7 +81,7 @@ struct RuleGroup: View {
                 } label: {
                     Image(systemName: checkboxSymbol)
                         .font(.title2)
-                        .foregroundStyle(cleanable.isEmpty ? Color.secondary : Color.accentColor)
+                        .foregroundStyle(cleanable.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
                 }
                 .buttonStyle(.plain)
                 .disabled(cleanable.isEmpty)
@@ -145,7 +145,7 @@ struct ItemRow: View {
         Button { model.toggle(item) } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: model.isSelected(item) ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(model.canClean(item) ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(model.canClean(item) ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).lineLimit(1).truncationMode(.middle)
                     if let detail = item.detail {

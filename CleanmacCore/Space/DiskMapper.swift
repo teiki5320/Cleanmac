@@ -86,7 +86,7 @@ public struct DiskMapper: Sendable {
     /// Au-delà, seuls les éléments au moins aussi gros sont gardés.
     public var minKeptBytes: Int64 = 1 << 20
     /// Nombre de gros fichiers retenus.
-    public var largeFileCount = 60
+    public var largeFileCount = 500
     /// Taille minimale d'un « gros fichier ».
     public var largeFileMinimum: Int64 = 50 << 20
     /// Fréquence des vérifications d'annulation et des rapports de progression.

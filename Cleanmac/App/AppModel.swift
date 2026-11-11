@@ -32,6 +32,8 @@ final class AppModel {
     let helper = HelperManager()
     /// Carte du disque (lecture seule).
     let diskMap = DiskMapModel()
+    /// Recherche des doublons (lecture seule).
+    let duplicates = DuplicatesModel()
 
     /// Réglage : suppression définitive des caches régénérables (désactivée par défaut).
     var allowPermanentDeletion: Bool {

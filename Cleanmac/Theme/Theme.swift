@@ -132,12 +132,13 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
     case corbeilles
     case icloud
     case carte
+    case doublons
     case applications
 
     var id: String { rawValue }
 
     static let cleaning: [Module] = [.analyse, .systeme, .developpeur, .mail, .corbeilles, .icloud]
-    static let spaceAndApps: [Module] = [.carte, .applications]
+    static let spaceAndApps: [Module] = [.carte, .doublons, .applications]
 
     var title: String {
         switch self {
@@ -148,6 +149,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .corbeilles: "Corbeilles"
         case .icloud: "iCloud Drive"
         case .carte: "Carte du disque"
+        case .doublons: "Doublons"
         case .applications: "Applications"
         }
     }
@@ -162,6 +164,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .corbeilles: "trash"
         case .icloud: "icloud"
         case .carte: "chart.pie"
+        case .doublons: "doc.on.doc"
         case .applications: "square.grid.2x2"
         }
     }
@@ -182,6 +185,8 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
             ModulePalette(deep: Color(hex: 0x06263A), mid: Color(hex: 0x0EA5E9), light: Color(hex: 0xBAE6FD), accent: Color(hex: 0xA5B4FC))
         case .carte:
             ModulePalette(deep: Color(hex: 0x03132E), mid: Color(hex: 0x1D4ED8), light: Color(hex: 0x7DD3FC), accent: Color(hex: 0x6366F1))
+        case .doublons:
+            ModulePalette(deep: Color(hex: 0x1B0B33), mid: Color(hex: 0x7E22CE), light: Color(hex: 0xD8B4FE), accent: Color(hex: 0x2DD4BF))
         case .applications:
             ModulePalette(deep: Color(hex: 0x2D0A1E), mid: Color(hex: 0xBE185D), light: Color(hex: 0xF9A8D4), accent: Color(hex: 0xA855F7))
         }
@@ -201,6 +206,8 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
             "La Corbeille du Mac, celles des disques externes et celle de Photos, réunies au même endroit."
         case .icloud:
             "Libère les fichiers d'iCloud Drive téléchargés sur le Mac, sans les supprimer d'iCloud."
+        case .doublons:
+            "Retrouve les fichiers au contenu identique dans votre dossier personnel, et suggère l'exemplaire à garder."
         case .carte:
             "Voyez ce qui prend la place, dossier par dossier : cliquez sur un anneau pour descendre, au centre pour remonter."
         case .applications:
@@ -238,6 +245,10 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
             [.init(title: "Vue en anneaux, dossier par dossier", symbol: "chart.pie"),
              .init(title: "Gros et anciens fichiers", symbol: "doc.badge.clock"),
              .init(title: "Lecture seule : rien n'est supprimé", symbol: "lock")]
+        case .doublons:
+            [.init(title: "Comparaison du contenu, pas du nom", symbol: "number"),
+             .init(title: "Copies APFS repérées", symbol: "square.on.square.dashed"),
+             .init(title: "Fichiers iCloud jamais téléchargés", symbol: "icloud.slash")]
         case .applications:
             [.init(title: "Désinstallation complète", symbol: "xmark.app"),
              .init(title: "Restes d'applis supprimées", symbol: "magnifyingglass"),
@@ -265,8 +276,8 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Module utilisable (la carte du disque n'a pas de règles : elle ne nettoie rien).
-    var isAvailable: Bool { scope != nil || self == .carte }
+    /// Module utilisable (la carte du disque et les doublons n'ont pas de règles : ils ne nettoient rien).
+    var isAvailable: Bool { scope != nil || self == .carte || self == .doublons }
 
     /// Petite ligne sous l'objet en verre.
     var caption: String {
@@ -275,6 +286,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .systeme, .developpeur: "Les éléments « sûrs » sont cochés d'office"
         case .mail, .corbeilles, .icloud: "Module à venir"
         case .carte: "Taille en direct pendant l'analyse"
+        case .doublons: "Fichiers de plus de 1 Mo, hors Bibliothèque"
         case .applications: "Module à venir"
         }
     }

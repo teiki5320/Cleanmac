@@ -1,5 +1,6 @@
 import AppKit
 import CleanmacCore
+import QuickLook
 import SwiftUI
 
 /// Écran de la carte du disque, une fois l'analyse terminée.
@@ -372,32 +373,98 @@ private struct DiskContentList: View {
     }
 }
 
-/// Les plus gros fichiers du dossier affiché.
+/// Les plus gros fichiers du dossier affiché, avec filtres et aperçu.
 private struct LargeFilesList: View {
     let files: [LargeFile]
+    @State private var minimum: SizeFilter = .all
+    @State private var age: AgeFilter = .all
+    @State private var kind: FileKind?
+    @State private var preview: URL?
+
+    enum SizeFilter: Int64, CaseIterable, Identifiable {
+        case all = 0
+        case mb100 = 100_000_000
+        case mb500 = 500_000_000
+        case gb1 = 1_000_000_000
+        var id: Int64 { rawValue }
+        var title: String {
+            switch self {
+            case .all: "Toutes tailles"
+            case .mb100: "Plus de 100 Mo"
+            case .mb500: "Plus de 500 Mo"
+            case .gb1: "Plus de 1 Go"
+            }
+        }
+    }
+
+    enum AgeFilter: Int, CaseIterable, Identifiable {
+        case all = 0
+        case months6 = 6
+        case year1 = 12
+        case years2 = 24
+        var id: Int { rawValue }
+        var title: String {
+            switch self {
+            case .all: "Toutes dates"
+            case .months6: "Pas modifiés depuis 6 mois"
+            case .year1: "Pas modifiés depuis 1 an"
+            case .years2: "Pas modifiés depuis 2 ans"
+            }
+        }
+        var limit: Date? {
+            rawValue == 0 ? nil : Calendar.current.date(byAdding: .month, value: -rawValue, to: .now)
+        }
+    }
+
+    private var filtered: [LargeFile] {
+        let limit = age.limit
+        return files.filter { file in
+            file.allocatedBytes >= minimum.rawValue
+                && (limit.map { file.modified < $0 } ?? true)
+                && (kind.map { FileKind.of(file.path) == $0 } ?? true)
+        }
+    }
 
     var body: some View {
-        if files.isEmpty {
-            Text("Aucun fichier de plus de 50 Mo dans ce dossier.")
-                .font(.system(size: 17))
+        let shown = filtered
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Picker("Taille", selection: $minimum) {
+                    ForEach(SizeFilter.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("Date", selection: $age) {
+                    ForEach(AgeFilter.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("Type", selection: $kind) {
+                    Text("Tous types").tag(FileKind?.none)
+                    ForEach(FileKind.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag(Optional($0)) }
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .controlSize(.large)
+            .fixedSize()
+            Text(shown.isEmpty
+                 ? "Aucun fichier de plus de 50 Mo ne correspond dans ce dossier."
+                 : "\(shown.count) fichiers, \(Bytes.text(shown.reduce(0) { $0 + $1.allocatedBytes })) au total")
+                .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.7))
-                .padding(.top, 8)
-            Spacer(minLength: 0)
-        } else {
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    ForEach(files) { file in row(file) }
+                    ForEach(shown) { file in row(file) }
                 }
             }
         }
+        .quickLookPreview($preview, in: shown.map { URL(fileURLWithPath: $0.path) })
     }
 
     private func row(_ file: LargeFile) -> some View {
         let old = file.modified < Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .distantPast
         return HStack(spacing: 12) {
-            Image(systemName: "doc.fill")
+            Image(systemName: FileKind.of(file.path).symbol)
                 .font(.system(size: 18))
                 .foregroundStyle(.white.opacity(0.7))
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 3) {
                 Text(file.name)
                     .font(.system(size: 17, weight: .medium))
@@ -424,6 +491,7 @@ private struct LargeFilesList: View {
             Spacer(minLength: 8)
             Text(Bytes.text(file.allocatedBytes))
                 .font(.system(size: 17, weight: .semibold).monospacedDigit())
+            QuickLookButton { preview = URL(fileURLWithPath: file.path) }
             FinderButton(path: file.path)
         }
         .padding(.vertical, 8)
@@ -432,8 +500,26 @@ private struct LargeFilesList: View {
     }
 }
 
+/// Bouton « Aperçu » (Coup d'œil).
+struct QuickLookButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "eye")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 40, height: 40)
+                .background(.white.opacity(0.1), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Aperçu")
+        .accessibilityLabel("Aperçu")
+    }
+}
+
 /// Bouton « Afficher dans le Finder ».
-private struct FinderButton: View {
+struct FinderButton: View {
     let path: String
 
     var body: some View {

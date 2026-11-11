@@ -17,17 +17,29 @@ struct MainWindowView: View {
     }
 
     private var isScanningModule: Bool {
-        module == .carte ? model.diskMap.isScanning : scanIsForModule && model.isScanning
+        switch module {
+        case .carte: model.diskMap.isScanning
+        case .doublons: model.duplicates.isScanning
+        default: scanIsForModule && model.isScanning
+        }
     }
     private var resultForModule: ScanResult? { scanIsForModule ? model.scanResult : nil }
     /// Le module affiché a-t-il un résultat à montrer ?
     private var moduleHasResult: Bool {
-        module == .carte ? model.diskMap.map != nil : resultForModule != nil
+        switch module {
+        case .carte: model.diskMap.map != nil
+        case .doublons: model.duplicates.scan != nil
+        default: resultForModule != nil
+        }
     }
     /// Avancement affiché sur l'objet en verre et le bouton rond.
     private var moduleProgress: Double? {
         guard isScanningModule else { return nil }
-        return module == .carte ? model.diskMap.estimatedFraction : scanFraction
+        switch module {
+        case .carte: return model.diskMap.estimatedFraction
+        case .doublons: return model.duplicates.progress?.fractionCompleted
+        default: return scanFraction
+        }
     }
 
     var body: some View {
@@ -71,6 +83,9 @@ struct MainWindowView: View {
         if module == .carte, let map = model.diskMap.map {
             DiskMapScreen(map: map)
                 .id("carte")
+        } else if module == .doublons, let scan = model.duplicates.scan {
+            DuplicatesScreen(scan: scan)
+                .id("doublons")
         } else if let result = resultForModule {
             ResultsPanel(module: module, result: result)
                 .id("resultats-\(module.id)")
@@ -111,7 +126,7 @@ struct MainWindowView: View {
     // MARK: Bouton rond
 
     private var scanButton: some View {
-        let busyElsewhere = module != .carte && model.isScanning && !scanIsForModule
+        let busyElsewhere = module.scope != nil && model.isScanning && !scanIsForModule
         let title: String
         let enabled: Bool
         if !module.isAvailable {
@@ -125,7 +140,7 @@ struct MainWindowView: View {
             enabled = !model.isCleaning
         } else {
             title = "Analyser"
-            enabled = model.rules != nil && !busyElsewhere
+            enabled = (module.scope == nil || model.rules != nil) && !busyElsewhere
         }
         return ScanButton(
             title: title,
@@ -136,6 +151,8 @@ struct MainWindowView: View {
         ) {
             if module == .carte {
                 if isScanningModule { model.diskMap.cancel() } else { model.diskMap.start() }
+            } else if module == .doublons {
+                if isScanningModule { model.duplicates.cancel() } else { model.duplicates.start() }
             } else if isScanningModule {
                 model.cancelScan()
             } else {
@@ -307,6 +324,15 @@ private struct InfoPanel: View {
                         diskMapStatus
                     }
                     .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
+                } else if module == .doublons {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Dossier personnel, sans la Bibliothèque ni les dossiers cachés", systemImage: "house")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white.opacity(0.75))
+                        statusLabel(cancelled: { if case .cancelled = model.duplicates.state { return true }; return false }(),
+                                    failure: { if case let .failed(message) = model.duplicates.state { return message }; return nil }())
+                    }
+                    .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
                 } else if module.isAvailable {
                     Button(action: openSettings) {
                         Text("Réglages de l'analyse")
@@ -332,19 +358,22 @@ private struct InfoPanel: View {
     }
 
     /// Message après une carte annulée ou en échec.
-    @ViewBuilder
     private var diskMapStatus: some View {
-        switch model.diskMap.state {
-        case .cancelled:
+        statusLabel(cancelled: { if case .cancelled = model.diskMap.state { return true }; return false }(),
+                    failure: { if case let .failed(message) = model.diskMap.state { return message }; return nil }())
+    }
+
+    /// « Analyse arrêtée » ou message d'erreur.
+    @ViewBuilder
+    private func statusLabel(cancelled: Bool, failure: String?) -> some View {
+        if let failure {
+            Label(failure, systemImage: "exclamationmark.triangle")
+                .font(.system(size: 16))
+                .foregroundStyle(.orange)
+        } else if cancelled {
             Label("Analyse arrêtée.", systemImage: "pause.circle")
                 .font(.system(size: 16))
                 .foregroundStyle(.white.opacity(0.75))
-        case let .failed(message):
-            Label(message, systemImage: "exclamationmark.triangle")
-                .font(.system(size: 16))
-                .foregroundStyle(.orange)
-        default:
-            EmptyView()
         }
     }
 
@@ -365,6 +394,30 @@ private struct InfoPanel: View {
                     .font(Theme.Typo.caption)
                     .foregroundStyle(.white.opacity(0.7))
                     .monospacedDigit()
+            }
+        } else if module == .doublons {
+            let progress = model.duplicates.progress
+            VStack(alignment: .leading, spacing: 10) {
+                Text(progress.map { DisplayPath.short($0.currentPath) } ?? "Préparation…")
+                    .font(Theme.Typo.body)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let progress, progress.phase == .comparing {
+                    Text("\(progress.compared.formatted()) / \(progress.candidates.formatted())")
+                        .font(.system(size: 54, weight: .bold).monospacedDigit())
+                        .contentTransition(.numericText())
+                    Text("fichiers de même taille comparés")
+                        .font(Theme.Typo.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                } else {
+                    Text((progress?.filesSeen ?? 0).formatted())
+                        .font(.system(size: 54, weight: .bold).monospacedDigit())
+                        .contentTransition(.numericText())
+                    Text("éléments inventoriés")
+                        .font(Theme.Typo.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
             }
         } else if case let .scanning(progress) = model.scanState {
             VStack(alignment: .leading, spacing: 10) {

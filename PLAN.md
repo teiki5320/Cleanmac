@@ -55,9 +55,13 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
       → 0.4.0 : anneaux sur trois niveaux, clic pour descendre, centre pour remonter, fil d'Ariane,
         liste du contenu, onglet des plus gros fichiers (> 50 Mo, « ancien » si non modifié depuis un an),
         « Afficher dans le Finder ». Dossier personnel ou tout le Mac. Reste à valider à l'écran.
-- [ ] **Gros et anciens fichiers** : filtres taille / date / type, aperçu Quick Look
-      → première version dans la carte du disque (liste triée par taille) ; filtres et Quick Look à faire
+- [x] **Gros et anciens fichiers** : filtres taille / date / type, aperçu Quick Look
+      → 0.5.0 : onglet « Gros fichiers » de la carte, filtres taille / ancienneté / type, aperçu Coup d'œil.
+        Reste à valider à l'écran.
 - [ ] **Doublons** : comparaison par taille puis empreinte, choix de l'exemplaire à garder
+      → 0.5.0 : recherche faite (taille, puis SHA-256 du début, puis complet), suggestion de l'exemplaire
+        à garder, copies APFS repérées, aperçu et Finder. En lecture seule : la mise à la Corbeille
+        depuis Cleanmac attend une décision (voir « Décisions »).
 - [ ] **Instantanés APFS locaux** et espace « purgeable » : affichage et purge (via l'outil d'aide)
 
 ## Phase 4 — Applications
@@ -140,3 +144,11 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   deux premiers niveaux de dossiers lus en parallèle (8 lectures au plus) : dossier personnel en ~6 s,
   tout le Mac (1,7 million de fichiers) en ~25 s. Petits éléments regroupés par dossier (40 gardés au plus).
 - Version 0.4.0 (build 5).
+- Doublons : recherche dans le dossier personnel, hors Bibliothèque, dossiers cachés, paquets (applis,
+  photothèques…) et dépôts de code. Fichiers de plus de 1 Mo. Les fichiers iCloud non téléchargés
+  (« dataless ») sont ignorés : les lire les téléchargerait, et ils ne prennent pas de place.
+- Doublons : suggestion de l'exemplaire à garder = hors Téléchargements, puis le plus ancien, puis le chemin
+  le plus court. Les copies APFS (drapeau EF_MAY_SHARE_BLOCKS) ne comptent pas dans l'espace « en trop ».
+- Doublons en **lecture seule** pour l'instant : la règle n°1 interdit de supprimer hors règle, et une règle
+  couvrant tout le dossier personnel viderait cette protection de son sens. À trancher avec l'utilisateur.
+- Version 0.5.0 (build 6).

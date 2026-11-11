@@ -16,8 +16,19 @@ struct MainWindowView: View {
         return scope.categories == model.scanCategories
     }
 
-    private var isScanningModule: Bool { scanIsForModule && model.isScanning }
+    private var isScanningModule: Bool {
+        module == .carte ? model.diskMap.isScanning : scanIsForModule && model.isScanning
+    }
     private var resultForModule: ScanResult? { scanIsForModule ? model.scanResult : nil }
+    /// Le module affiché a-t-il un résultat à montrer ?
+    private var moduleHasResult: Bool {
+        module == .carte ? model.diskMap.map != nil : resultForModule != nil
+    }
+    /// Avancement affiché sur l'objet en verre et le bouton rond.
+    private var moduleProgress: Double? {
+        guard isScanningModule else { return nil }
+        return module == .carte ? model.diskMap.estimatedFraction : scanFraction
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -57,7 +68,10 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private var content: some View {
-        if let result = resultForModule {
+        if module == .carte, let map = model.diskMap.map {
+            DiskMapScreen(map: map)
+                .id("carte")
+        } else if let result = resultForModule {
             ResultsPanel(module: module, result: result)
                 .id("resultats-\(module.id)")
         } else {
@@ -82,7 +96,7 @@ struct MainWindowView: View {
 
     private var hero: some View {
         VStack(spacing: 6) {
-            HeroView(module: module, isScanning: isScanningModule, progress: isScanningModule ? scanFraction : nil)
+            HeroView(module: module, isScanning: isScanningModule, progress: moduleProgress)
             Text(module.caption)
                 .font(Theme.Typo.caption)
                 .foregroundStyle(.white.opacity(0.72))
@@ -97,7 +111,7 @@ struct MainWindowView: View {
     // MARK: Bouton rond
 
     private var scanButton: some View {
-        let busyElsewhere = model.isScanning && !scanIsForModule
+        let busyElsewhere = module != .carte && model.isScanning && !scanIsForModule
         let title: String
         let enabled: Bool
         if !module.isAvailable {
@@ -106,7 +120,7 @@ struct MainWindowView: View {
         } else if isScanningModule {
             title = "Arrêter"
             enabled = true
-        } else if resultForModule != nil {
+        } else if moduleHasResult {
             title = "Relancer"
             enabled = !model.isCleaning
         } else {
@@ -116,11 +130,13 @@ struct MainWindowView: View {
         return ScanButton(
             title: title,
             palette: palette,
-            progress: isScanningModule ? scanFraction : nil,
+            progress: moduleProgress,
             enabled: enabled,
-            isDefaultAction: resultForModule == nil
+            isDefaultAction: !moduleHasResult
         ) {
-            if isScanningModule {
+            if module == .carte {
+                if isScanningModule { model.diskMap.cancel() } else { model.diskMap.start() }
+            } else if isScanningModule {
                 model.cancelScan()
             } else {
                 model.startScan(categories: module.scope?.categories)
@@ -285,7 +301,13 @@ private struct InfoPanel: View {
                         .modifier(Rise(appeared: appeared, delay: 0.35 + Double(index) * 0.12, reduceMotion: reduceMotion))
                     }
                 }
-                if module.isAvailable {
+                if module == .carte {
+                    VStack(alignment: .leading, spacing: 12) {
+                        DiskRootPicker()
+                        diskMapStatus
+                    }
+                    .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
+                } else if module.isAvailable {
                     Button(action: openSettings) {
                         Text("Réglages de l'analyse")
                             .font(.system(size: 16, weight: .semibold))
@@ -309,9 +331,42 @@ private struct InfoPanel: View {
         .onAppear { appeared = true }
     }
 
+    /// Message après une carte annulée ou en échec.
+    @ViewBuilder
+    private var diskMapStatus: some View {
+        switch model.diskMap.state {
+        case .cancelled:
+            Label("Analyse arrêtée.", systemImage: "pause.circle")
+                .font(.system(size: 16))
+                .foregroundStyle(.white.opacity(0.75))
+        case let .failed(message):
+            Label(message, systemImage: "exclamationmark.triangle")
+                .font(.system(size: 16))
+                .foregroundStyle(.orange)
+        default:
+            EmptyView()
+        }
+    }
+
     @ViewBuilder
     private var scanningDetails: some View {
-        if case let .scanning(progress) = model.scanState {
+        if module == .carte {
+            let progress = model.diskMap.progress
+            VStack(alignment: .leading, spacing: 10) {
+                Text(progress.map { DisplayPath.short($0.currentPath) } ?? "Préparation…")
+                    .font(Theme.Typo.body)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(Bytes.text(progress?.bytesFound ?? 0))
+                    .font(.system(size: 54, weight: .bold).monospacedDigit())
+                    .contentTransition(.numericText())
+                Text("\((progress?.filesVisited ?? 0).formatted()) fichiers parcourus — \(model.diskMap.root.title)")
+                    .font(Theme.Typo.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .monospacedDigit()
+            }
+        } else if case let .scanning(progress) = model.scanState {
             VStack(alignment: .leading, spacing: 10) {
                 Text(progress?.currentRuleName ?? "Préparation…")
                     .font(Theme.Typo.body)

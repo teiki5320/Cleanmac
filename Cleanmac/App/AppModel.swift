@@ -30,6 +30,8 @@ final class AppModel {
     var selection: Set<String> = []
     var journalEntries: [JournalEntry] = []
     let helper = HelperManager()
+    /// Carte du disque (lecture seule).
+    let diskMap = DiskMapModel()
 
     /// Réglage : suppression définitive des caches régénérables (désactivée par défaut).
     var allowPermanentDeletion: Bool {

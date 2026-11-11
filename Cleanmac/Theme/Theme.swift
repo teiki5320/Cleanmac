@@ -77,6 +77,22 @@ enum Theme {
     static var moduleTransition: Animation { .smooth(duration: 0.5) }
 }
 
+/// Couleurs des secteurs de la carte du disque : une par élément du premier anneau,
+/// reprise plus pâle sur les anneaux extérieurs.
+enum DiskMapColors {
+    static let palette: [Color] = [
+        0xF472B6, 0xA78BFA, 0x60A5FA, 0x22D3EE, 0x34D399,
+        0xFBBF24, 0xFB923C, 0xF87171, 0xA3E635, 0xE879F9,
+    ].map { Color(hex: $0) }
+
+    static func color(_ index: Int, depth: Int) -> Color {
+        palette[index % palette.count].opacity(depth <= 1 ? 1 : depth == 2 ? 0.72 : 0.5)
+    }
+
+    /// Petits éléments regroupés.
+    static let others = Color.white.opacity(0.22)
+}
+
 /// Ce que l'analyse d'un module parcourt.
 enum ScanScope: Equatable, Sendable {
     /// Toutes les règles.
@@ -186,7 +202,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .icloud:
             "Libère les fichiers d'iCloud Drive téléchargés sur le Mac, sans les supprimer d'iCloud."
         case .carte:
-            "Voyez ce qui prend la place, dossier par dossier, et entrez dans les anneaux pour descendre plus bas."
+            "Voyez ce qui prend la place, dossier par dossier : cliquez sur un anneau pour descendre, au centre pour remonter."
         case .applications:
             "Désinstallez une appli avec tous ses fichiers, retrouvez les restes et gérez le démarrage."
         }
@@ -219,9 +235,9 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
              .init(title: "Libérer sans supprimer", symbol: "icloud.and.arrow.up"),
              .init(title: "Toujours dans iCloud", symbol: "checkmark.icloud")]
         case .carte:
-            [.init(title: "Vue en anneaux", symbol: "chart.pie"),
+            [.init(title: "Vue en anneaux, dossier par dossier", symbol: "chart.pie"),
              .init(title: "Gros et anciens fichiers", symbol: "doc.badge.clock"),
-             .init(title: "Doublons", symbol: "doc.on.doc")]
+             .init(title: "Lecture seule : rien n'est supprimé", symbol: "lock")]
         case .applications:
             [.init(title: "Désinstallation complète", symbol: "xmark.app"),
              .init(title: "Restes d'applis supprimées", symbol: "magnifyingglass"),
@@ -249,7 +265,8 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var isAvailable: Bool { scope != nil }
+    /// Module utilisable (la carte du disque n'a pas de règles : elle ne nettoie rien).
+    var isAvailable: Bool { scope != nil || self == .carte }
 
     /// Petite ligne sous l'objet en verre.
     var caption: String {
@@ -257,7 +274,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .analyse: "Toutes les règles, en une seule analyse"
         case .systeme, .developpeur: "Les éléments « sûrs » sont cochés d'office"
         case .mail, .corbeilles, .icloud: "Module à venir"
-        case .carte: "Module à venir"
+        case .carte: "Taille en direct pendant l'analyse"
         case .applications: "Module à venir"
         }
     }

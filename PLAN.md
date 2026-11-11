@@ -51,8 +51,12 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
       sans les supprimer d'iCloud
 
 ## Phase 3 — Espace disque
-- [ ] **Carte du disque** : vue en anneaux ou en blocs, navigation par dossier, taille en direct
+- [x] **Carte du disque** : vue en anneaux ou en blocs, navigation par dossier, taille en direct
+      → 0.4.0 : anneaux sur trois niveaux, clic pour descendre, centre pour remonter, fil d'Ariane,
+        liste du contenu, onglet des plus gros fichiers (> 50 Mo, « ancien » si non modifié depuis un an),
+        « Afficher dans le Finder ». Dossier personnel ou tout le Mac. Reste à valider à l'écran.
 - [ ] **Gros et anciens fichiers** : filtres taille / date / type, aperçu Quick Look
+      → première version dans la carte du disque (liste triée par taille) ; filtres et Quick Look à faire
 - [ ] **Doublons** : comparaison par taille puis empreinte, choix de l'exemplaire à garder
 - [ ] **Instantanés APFS locaux** et espace « purgeable » : affichage et purge (via l'outil d'aide)
 
@@ -128,3 +132,11 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - Le premier module s'appelle « Analyse complète » (et non plus « Analyse en un clic ») : il parcourt
   toutes les règles, y compris les éléments « à vérifier », ce que l'ancien nom ne disait pas.
 - Version 0.3.1 (build 4).
+- Carte du disque en **lecture seule** : aucune suppression depuis la carte (règle n°1 : rien hors règle).
+  Elle sert à comprendre où part la place ; on agit via les modules de nettoyage ou le Finder.
+- Carte : « Tout le Mac » lit le volume de données `/System/Volumes/Data` (le système est scellé, et
+  /Users, /Applications… y renvoient : on évite de compter deux fois). Pas de traversée des autres volumes.
+- Carte : lecture POSIX (`readdir` + `fstatat`, liens jamais suivis, liens physiques comptés une fois),
+  deux premiers niveaux de dossiers lus en parallèle (8 lectures au plus) : dossier personnel en ~6 s,
+  tout le Mac (1,7 million de fichiers) en ~25 s. Petits éléments regroupés par dossier (40 gardés au plus).
+- Version 0.4.0 (build 5).

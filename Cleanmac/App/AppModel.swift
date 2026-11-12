@@ -32,7 +32,7 @@ final class AppModel {
     let helper = HelperManager()
     /// Carte du disque (lecture seule).
     let diskMap = DiskMapModel()
-    /// Recherche des doublons (lecture seule).
+    /// Recherche des doublons et mise à la Corbeille des copies.
     let duplicates = DuplicatesModel()
 
     /// Réglage : suppression définitive des caches régénérables (désactivée par défaut).
@@ -51,6 +51,12 @@ final class AppModel {
         refreshFullDiskAccess()
         loadRules()
         journalEntries = journal.entries()
+        // Exclusions relues à chaque usage : la recherche de doublons ne passe pas par `startScan`.
+        duplicates.makeCleaner = { [unowned self] in
+            self.exclusions = ExclusionStore().load()
+            return self.makeCleaner()
+        }
+        duplicates.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
     }
 
     func refreshFullDiskAccess() {
@@ -120,7 +126,7 @@ final class AppModel {
     }
 
     /// Nettoyeur configuré avec les réglages actuels (sert aussi aux vérifications d'affichage).
-    private func makeCleaner() -> Cleaner? {
+    func makeCleaner() -> Cleaner? {
         rules.map {
             Cleaner(
                 rules: $0,

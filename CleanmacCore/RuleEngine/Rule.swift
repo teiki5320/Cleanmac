@@ -22,6 +22,7 @@ public enum RuleCategory: String, Codable, Sendable, CaseIterable {
     case trash
     case icloud
     case apps
+    case duplicates
 
     public var title: String {
         switch self {
@@ -31,6 +32,7 @@ public enum RuleCategory: String, Codable, Sendable, CaseIterable {
         case .trash: "Corbeilles"
         case .icloud: "iCloud Drive"
         case .apps: "Applications"
+        case .duplicates: "Doublons"
         }
     }
 }
@@ -53,6 +55,11 @@ public enum RuleCategory: String, Codable, Sendable, CaseIterable {
 ///   par un outil du système (ex. `simulatorRuntimes` via `xcrun simctl`). `paths` est alors vide.
 ///   Ces éléments ne peuvent pas aller à la Corbeille : ils exigent donc une règle `regenerable`
 ///   et la suppression définitive activée par l'utilisateur.
+/// - `check` (facultatif) : contrôle supplémentaire fait juste avant chaque suppression.
+///   Les `paths` désignent alors des dossiers (sans joker) et la règle couvre les fichiers situés
+///   à l'intérieur, à n'importe quelle profondeur. Le scanner ignore ces règles : leurs éléments
+///   viennent d'un autre module (ex. `duplicateCopy` pour les doublons). Elles sont toujours
+///   « à vérifier », jamais régénérables : leurs éléments vont uniquement à la Corbeille.
 public struct Rule: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let name: String
@@ -63,6 +70,7 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
     public let excludes: [String]
     public let regenerable: Bool
     public let source: RuleSource?
+    public let check: RuleCheck?
 
     public init(
         id: String,
@@ -73,7 +81,8 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
         paths: [String],
         excludes: [String] = [],
         regenerable: Bool = false,
-        source: RuleSource? = nil
+        source: RuleSource? = nil,
+        check: RuleCheck? = nil
     ) {
         self.id = id
         self.name = name
@@ -84,10 +93,11 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
         self.excludes = excludes
         self.regenerable = regenerable
         self.source = source
+        self.check = check
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, risk, explanation, paths, excludes, regenerable, source
+        case id, name, category, risk, explanation, paths, excludes, regenerable, source, check
     }
 
     public init(from decoder: Decoder) throws {
@@ -101,6 +111,7 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
         excludes = try c.decodeIfPresent([String].self, forKey: .excludes) ?? []
         regenerable = try c.decodeIfPresent(Bool.self, forKey: .regenerable) ?? false
         source = try c.decodeIfPresent(RuleSource.self, forKey: .source)
+        check = try c.decodeIfPresent(RuleCheck.self, forKey: .check)
     }
 
     /// Un élément est coché par défaut seulement si la règle est « sûre ».
@@ -111,6 +122,14 @@ public struct Rule: Codable, Sendable, Hashable, Identifiable {
 public enum RuleSource: String, Codable, Sendable, CaseIterable {
     /// Systèmes des simulateurs, gérés par `xcrun simctl runtime`.
     case simulatorRuntimes
+}
+
+/// Contrôles supplémentaires faits par le nettoyeur juste avant de supprimer.
+public enum RuleCheck: String, Codable, Sendable, CaseIterable {
+    /// Copie d'un fichier gardé ailleurs : la demande nomme l'exemplaire gardé, qui doit
+    /// exister, ne pas être supprimé dans le même nettoyage et avoir exactement le même contenu
+    /// (comparaison octet par octet au moment du nettoyage).
+    case duplicateCopy
 }
 
 /// Contenu d'un fichier `Rules/*.json`.

@@ -207,7 +207,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .icloud:
             "Libère les fichiers d'iCloud Drive téléchargés sur le Mac, sans les supprimer d'iCloud."
         case .doublons:
-            "Retrouve les fichiers au contenu identique dans votre dossier personnel, et suggère l'exemplaire à garder."
+            "Retrouve les fichiers au contenu identique dans votre dossier personnel, suggère l'exemplaire à garder et met à la Corbeille les copies que vous cochez."
         case .carte:
             "Voyez ce qui prend la place, dossier par dossier : cliquez sur un anneau pour descendre, au centre pour remonter."
         case .applications:
@@ -247,8 +247,8 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
              .init(title: "Lecture seule : rien n'est supprimé", symbol: "lock")]
         case .doublons:
             [.init(title: "Comparaison du contenu, pas du nom", symbol: "number"),
-             .init(title: "Copies APFS repérées", symbol: "square.on.square.dashed"),
-             .init(title: "Fichiers iCloud jamais téléchargés", symbol: "icloud.slash")]
+             .init(title: "Vous choisissez l'exemplaire à garder", symbol: "checkmark.shield"),
+             .init(title: "Copies à la Corbeille, revérifiées avant", symbol: "trash")]
         case .applications:
             [.init(title: "Désinstallation complète", symbol: "xmark.app"),
              .init(title: "Restes d'applis supprimées", symbol: "magnifyingglass"),

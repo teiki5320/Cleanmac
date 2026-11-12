@@ -7,6 +7,7 @@ public enum RuleError: Error, Equatable, LocalizedError {
     case emptyPaths(ruleID: String)
     case invalidSource(ruleID: String, reason: String)
     case invalidPath(ruleID: String, path: String, reason: String)
+    case invalidCheck(ruleID: String, reason: String)
     case noRuleFiles
 
     public var errorDescription: String? {
@@ -21,6 +22,8 @@ public enum RuleError: Error, Equatable, LocalizedError {
             "Règle \(id) : \(reason)"
         case let .invalidPath(id, path, reason):
             "Chemin refusé dans la règle \(id) (\(path)) : \(reason)"
+        case let .invalidCheck(id, reason):
+            "Règle \(id) : \(reason)"
         case .noRuleFiles:
             "Aucun fichier de règles trouvé."
         }
@@ -87,6 +90,9 @@ public struct RuleBook: Sendable {
         for rule in rules {
             guard seen.insert(rule.id).inserted else { throw RuleError.duplicateID(rule.id) }
             if rule.source != nil {
+                guard rule.check == nil else {
+                    throw RuleError.invalidCheck(ruleID: rule.id, reason: "une règle à source ne peut pas avoir de contrôle")
+                }
                 guard rule.paths.isEmpty, rule.excludes.isEmpty else {
                     throw RuleError.invalidSource(ruleID: rule.id, reason: "une règle à source ne déclare pas de chemins")
                 }
@@ -99,6 +105,14 @@ public struct RuleBook: Sendable {
             for path in rule.paths + rule.excludes {
                 if let reason = PathPattern.problem(with: path) {
                     throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: reason)
+                }
+                if rule.check != nil, path.split(separator: "/").contains(where: { PathPattern.hasGlob(String($0)) }) {
+                    throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "joker interdit dans une règle à contrôle")
+                }
+            }
+            if rule.check != nil {
+                guard rule.risk == .review, !rule.regenerable else {
+                    throw RuleError.invalidCheck(ruleID: rule.id, reason: "une règle à contrôle est « à vérifier » et non régénérable")
                 }
             }
         }

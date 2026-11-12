@@ -3,11 +3,13 @@ import QuickLook
 import SwiftUI
 
 /// Écran des doublons, une fois la recherche terminée.
-/// Lecture seule : on compare, on prévisualise et on ouvre dans le Finder, sans supprimer d'ici.
+/// On choisit l'exemplaire à garder, on coche les copies, puis on vérifie avant la Corbeille.
 struct DuplicatesScreen: View {
     let scan: DuplicateScan
+    @Environment(AppModel.self) private var app
     @State private var kind: FileKind?
     @State private var preview: URL?
+    @State private var showReview = false
 
     private var groups: [DuplicateGroup] {
         kind.map { wanted in scan.groups.filter { $0.kind == wanted } } ?? scan.groups
@@ -15,43 +17,96 @@ struct DuplicatesScreen: View {
 
     var body: some View {
         let shown = groups
+        let model = app.duplicates
         VStack(alignment: .leading, spacing: 18) {
             header
             if scan.groups.isEmpty {
                 empty
             } else {
-                HStack(spacing: 12) {
-                    Picker("Type", selection: $kind) {
-                        Text("Tous types").tag(FileKind?.none)
-                        ForEach(FileKind.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag(Optional($0)) }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .controlSize(.large)
-                    .fixedSize()
-                    Text("\(shown.count) groupes, \(Bytes.text(shown.reduce(0) { $0 + $1.wastedBytes })) en trop")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.75))
-                }
+                toolbar(shown, model: model)
                 ScrollView {
                     LazyVStack(spacing: 14) {
                         ForEach(shown) { group in
-                            GroupCard(group: group) { preview = URL(fileURLWithPath: $0.path) }
+                            GroupCard(group: group, model: model) { preview = URL(fileURLWithPath: $0.path) }
                         }
                     }
                     .padding(.bottom, 8)
                 }
                 .quickLookPreview($preview, in: shown.flatMap(\.files).map { URL(fileURLWithPath: $0.path) })
             }
-            Label("Lecture seule : rien n'est supprimé ici. Supprimez les exemplaires inutiles depuis le Finder (bouton loupe).",
-                  systemImage: "lock")
+            Label("Les copies cochées vont à la Corbeille, après vérification que leur contenu est identique à l'exemplaire gardé. Bureau, Documents, Images et dossiers de code restent protégés : passez par le Finder (bouton loupe).",
+                  systemImage: "lock.shield")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.65))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(.white)
         .padding(.top, 44)
         .padding(.horizontal, 32)
         .padding(.bottom, 150)
+        .sheet(isPresented: $showReview) {
+            DuplicateReviewSheet(model: model)
+        }
+    }
+
+    private func toolbar(_ shown: [DuplicateGroup], model: DuplicatesModel) -> some View {
+        let count = model.selectedCopies.count
+        let trashable = model.trashableCount(in: shown)
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                filter
+                selectionButton(shown, model: model, trashable: trashable)
+                Spacer(minLength: 8)
+                trashButton(count: count, bytes: model.selectedBytes)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    filter
+                    selectionButton(shown, model: model, trashable: trashable)
+                }
+                trashButton(count: count, bytes: model.selectedBytes)
+            }
+        }
+    }
+
+    private var filter: some View {
+        Picker("Type", selection: $kind) {
+            Text("Tous types").tag(FileKind?.none)
+            ForEach(FileKind.allCases, id: \.self) { Label($0.title, systemImage: $0.symbol).tag(Optional($0)) }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .controlSize(.large)
+        .fixedSize()
+    }
+
+    @ViewBuilder
+    private func selectionButton(_ shown: [DuplicateGroup], model: DuplicatesModel, trashable: Int) -> some View {
+        let selectedHere = shown.contains { group in group.files.contains { model.isSelected($0, in: group) } }
+        if selectedHere {
+            Button("Tout décocher") { model.deselect(in: shown) }
+                .controlSize(.large)
+        } else {
+            Button("Cocher " + copies(trashable)) { model.selectAllCopies(in: shown) }
+                .controlSize(.large)
+                .disabled(trashable == 0)
+                .help("Coche toutes les copies autorisées, en gardant l'exemplaire marqué « à garder » de chaque groupe.")
+        }
+    }
+
+    private func trashButton(count: Int, bytes: Int64) -> some View {
+        Button {
+            showReview = true
+        } label: {
+            Label(count == 0 ? "Aucune copie cochée" : "Vérifier et mettre " + copies(count) + " à la Corbeille (\(Bytes.text(bytes)))",
+                  systemImage: "trash")
+                .font(.system(size: 16, weight: .semibold))
+                .padding(.horizontal, 6)
+        }
+        .controlSize(.extraLarge)
+        .buttonStyle(.borderedProminent)
+        .tint(.purple)
+        .disabled(count == 0)
     }
 
     private var header: some View {
@@ -59,7 +114,7 @@ struct DuplicatesScreen: View {
             GlassIcon(symbol: "doc.on.doc")
             VStack(alignment: .leading, spacing: 2) {
                 Text("Doublons").font(.system(size: 34, weight: .semibold))
-                Text((scan.groups.isEmpty ? "Aucun doublon" : "\(Bytes.text(scan.wastedBytes)) en trop") + " — \(scan.filesExamined.formatted()) fichiers comparés en \(scan.duration.formatted(.units(allowed: [.seconds], width: .abbreviated)))"
+                Text((scan.groups.isEmpty ? "Aucun doublon" : "\(scan.groups.count) groupes, \(Bytes.text(scan.wastedBytes)) en trop") + " — \(scan.filesExamined.formatted()) fichiers comparés en \(scan.duration.formatted(.units(allowed: [.seconds], width: .abbreviated)))"
                      + (scan.unreadableCount > 0 ? ", \(scan.unreadableCount.formatted()) illisibles" : ""))
                     .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.7))
@@ -88,6 +143,7 @@ struct DuplicatesScreen: View {
 /// Un groupe de fichiers identiques.
 private struct GroupCard: View {
     let group: DuplicateGroup
+    let model: DuplicatesModel
     let preview: (DuplicateFile) -> Void
 
     var body: some View {
@@ -114,8 +170,8 @@ private struct GroupCard: View {
                         .foregroundStyle(.white.opacity(0.65))
                 }
             }
-            ForEach(Array(group.files.enumerated()), id: \.element.id) { index, file in
-                FileRow(file: file, isSuggestedKeep: index == 0) { preview(file) }
+            ForEach(group.files) { file in
+                FileRow(file: file, group: group, model: model) { preview(file) }
             }
             if group.hasClones {
                 Label("Copie APFS : ces exemplaires partagent peut-être le même espace sur le disque. En supprimer un ne libère alors presque rien.",
@@ -135,36 +191,69 @@ private struct GroupCard: View {
 
 private struct FileRow: View {
     let file: DuplicateFile
-    let isSuggestedKeep: Bool
+    let group: DuplicateGroup
+    let model: DuplicatesModel
     let preview: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        let isKeeper = model.isKeeper(file, in: group)
+        let selected = model.isSelected(file, in: group)
+        let blocked = model.blocked[file.path]
+        HStack(spacing: 12) {
+            checkbox(isKeeper: isKeeper, selected: selected, blocked: blocked)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(DisplayPath.short(file.path))
-                        .font(.system(size: 16, weight: isSuggestedKeep ? .semibold : .regular))
+                        .font(.system(size: 16, weight: isKeeper ? .semibold : .regular))
                         .lineLimit(1)
                         .truncationMode(.head)
-                    if isSuggestedKeep {
-                        badge("à garder", color: .green)
-                    }
-                    if file.mayShareBlocks {
-                        badge("copie APFS", color: .teal)
-                    }
+                    if isKeeper { badge("à garder", color: .green) }
+                    if selected { badge("Corbeille", color: .purple) }
+                    if file.mayShareBlocks { badge("copie APFS", color: .teal) }
                 }
-                Text("modifié \(file.modified.formatted(date: .abbreviated, time: .shortened))")
+                Text("modifié \(file.modified.formatted(date: .abbreviated, time: .shortened))"
+                     + (blocked.map { " — \($0)" } ?? ""))
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(2)
             }
             Spacer(minLength: 8)
+            if !isKeeper {
+                Button("Garder celui-ci") { model.keep(file, in: group) }
+                    .controlSize(.large)
+                    .help("Garder cet exemplaire à la place de l'autre")
+            }
             QuickLookButton(action: preview)
             FinderButton(path: file.path)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
-        .background(.white.opacity(isSuggestedKeep ? 0.08 : 0), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(rowFill(isKeeper: isKeeper, selected: selected),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .help(file.path)
+    }
+
+    @ViewBuilder
+    private func checkbox(isKeeper: Bool, selected: Bool, blocked: String?) -> some View {
+        let symbol = isKeeper ? "checkmark.shield.fill" : blocked != nil ? "lock.fill" : selected ? "checkmark.square.fill" : "square"
+        Button {
+            model.toggle(file, in: group)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 24))
+                .foregroundStyle(isKeeper ? Color.green : selected ? Color.purple : .white.opacity(blocked != nil ? 0.4 : 0.8))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isKeeper || blocked != nil)
+        .help(isKeeper ? "Exemplaire gardé" : blocked ?? (selected ? "Ne pas mettre à la Corbeille" : "Mettre à la Corbeille"))
+        .accessibilityLabel(isKeeper ? "Exemplaire gardé" : selected ? "Copie cochée pour la Corbeille" : "Copie non cochée")
+    }
+
+    private func rowFill(isKeeper: Bool, selected: Bool) -> Color {
+        if selected { return .purple.opacity(0.18) }
+        return .white.opacity(isKeeper ? 0.08 : 0)
     }
 
     private func badge(_ text: String, color: Color) -> some View {
@@ -174,4 +263,128 @@ private struct FileRow: View {
             .padding(.vertical, 2)
             .background(Capsule().fill(color.opacity(0.35)))
     }
+}
+
+/// Écran de vérification obligatoire avant de mettre des copies à la Corbeille.
+private struct DuplicateReviewSheet: View {
+    let model: DuplicatesModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            switch model.cleanState {
+            case let .cleaning(done, total):
+                Text("Vérification et mise à la Corbeille…").font(.title.bold())
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                Text("\(done) sur \(total)").monospacedDigit().foregroundStyle(.secondary)
+            case let .finished(entry):
+                finished(entry)
+            case let .failed(message):
+                Text("L'opération a échoué").font(.title.bold())
+                Text(message).foregroundStyle(.red)
+                Button("Fermer") { model.dismissCleanResult(); dismiss() }
+            case .idle:
+                review
+            }
+        }
+        .padding(28)
+        .frame(width: 720)
+        .frame(minHeight: 420)
+        .controlSize(.large)
+        .interactiveDismissDisabled(model.isCleaning)
+    }
+
+    private var review: some View {
+        let selected = model.selectedCopies
+        return VStack(alignment: .leading, spacing: 18) {
+            Text("Vérification avant la Corbeille").font(.title.bold())
+            Text(Bytes.text(model.selectedBytes))
+                .font(.system(size: 44, weight: .bold).monospacedDigit())
+            Text(copies(selected.count).capitalizedFirst + " à mettre à la Corbeille. Pour chacune, l'exemplaire gardé est indiqué dessous.")
+                .font(.title3)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(selected, id: \.file.path) { copy in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Label(DisplayPath.short(copy.file.path), systemImage: "trash")
+                                    .lineLimit(1).truncationMode(.head)
+                                Spacer()
+                                Text(copy.file.mayShareBlocks ? "copie APFS" : Bytes.text(copy.file.allocatedBytes))
+                                    .monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            Label("garde : " + DisplayPath.short(model.keeper(of: copy.group) ?? ""), systemImage: "checkmark.shield")
+                                .lineLimit(1).truncationMode(.head)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 300)
+
+            Label("Juste avant, Cleanmac revérifie chaque copie : l'exemplaire gardé doit exister et avoir exactement le même contenu, sinon la copie est conservée. L'espace n'est libéré qu'une fois la Corbeille vidée.",
+                  systemImage: "info.circle")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack {
+                Button("Annuler", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Mettre à la Corbeille") { model.trashSelection() }
+                    .keyboardShortcut(.defaultAction)
+                    .controlSize(.extraLarge)
+                    .disabled(selected.isEmpty)
+            }
+        }
+    }
+
+    private func finished(_ entry: JournalEntry) -> some View {
+        let failures = entry.items.filter { !$0.succeeded }
+        let trashed = entry.items.filter(\.succeeded)
+        return VStack(alignment: .leading, spacing: 16) {
+            Label(trashed.isEmpty ? "Aucune copie supprimée" : "Copies mises à la Corbeille",
+                  systemImage: trashed.isEmpty ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                .font(.title.bold())
+                .foregroundStyle(trashed.isEmpty ? .orange : .green)
+            Text(Bytes.text(entry.freedBytes))
+                .font(.system(size: 44, weight: .bold).monospacedDigit())
+            if !trashed.isEmpty {
+                Text((trashed.count == 1 ? "1 copie est" : "\(trashed.count) copies sont") + " dans la Corbeille. Videz-la pour libérer l'espace sur le disque.")
+                    .font(.title3)
+            }
+            if !failures.isEmpty {
+                Text((failures.count == 1 ? "1 copie a été conservée :" : "\(failures.count) copies ont été conservées :")).font(.title3.weight(.semibold))
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(failures, id: \.path) { item in
+                            Text("\((item.path as NSString).lastPathComponent) — \(item.message ?? "erreur")")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .frame(maxHeight: 160)
+            }
+            HStack {
+                if !trashed.isEmpty {
+                    Button("Ouvrir la Corbeille") {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
+                    }
+                }
+                Spacer()
+                Button("Fermer") { model.dismissCleanResult(); dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+}
+
+/// « 1 copie », « 3 copies ».
+private func copies(_ count: Int) -> String {
+    count == 1 ? "1 copie" : "\(count) copies"
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

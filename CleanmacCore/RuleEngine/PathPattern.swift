@@ -58,8 +58,17 @@ public struct PathPattern: Sendable {
     }
 
     /// Le chemin correspond-il à l'un des chemins de la règle, hors exclusions ?
+    /// Pour une règle à contrôle, les chemins sont des dossiers : le chemin doit être strictement
+    /// à l'intérieur (jamais le dossier lui-même).
     public func matches(_ path: String, rule: Rule) -> Bool {
-        rule.paths.contains { matches(path, pattern: $0) }
+        if rule.check != nil {
+            func inside(_ folder: String) -> Bool {
+                let base = Self.trimmed(absolute(folder))
+                return path.hasPrefix(base + "/") && path.count > base.count + 1
+            }
+            return rule.paths.contains(where: inside) && !rule.excludes.contains(where: inside)
+        }
+        return rule.paths.contains { matches(path, pattern: $0) }
             && !rule.excludes.contains { matches(path, pattern: $0) }
     }
 

@@ -101,6 +101,8 @@ public struct Scanner: Sendable {
 
         for (index, rule) in rules.enumerated() {
             try Task.checkCancellation()
+            // Les règles à contrôle (doublons…) ne se scannent pas : leurs éléments viennent d'un autre module.
+            if rule.check != nil { continue }
             state.ruleIndex = index
             state.currentRuleName = rule.name
             progress?(state)

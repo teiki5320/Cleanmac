@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Opérations de suppression réelles (remplaçables dans les tests).
@@ -28,11 +29,15 @@ public struct CleanRequest: Sendable, Hashable {
     public let path: String
     public let ruleID: String
     public let bytes: Int64
+    /// Exemplaire gardé, pour les règles `duplicateCopy` : la copie n'est supprimée que s'il
+    /// existe et a exactement le même contenu.
+    public let keeperPath: String?
 
-    public init(path: String, ruleID: String, bytes: Int64) {
+    public init(path: String, ruleID: String, bytes: Int64, keeperPath: String? = nil) {
         self.path = path
         self.ruleID = ruleID
         self.bytes = bytes
+        self.keeperPath = keeperPath
     }
 
     public init(_ item: ScanItem) {
@@ -48,6 +53,13 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
     case missing
     case permanentDeletionDisabled
     case sourceUnavailable
+    case keeperRequired
+    case keeperMissing
+    case keeperInSameClean
+    case sameFile
+    case notRegularFile
+    case notDownloaded
+    case contentDiffers
 
     public var description: String {
         switch self {
@@ -58,6 +70,13 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
         case .permanentDeletionDisabled:
             "Ne peut pas aller à la Corbeille : activez la suppression définitive dans les réglages"
         case .sourceUnavailable: "Outil du système indisponible"
+        case .keeperRequired: "Exemplaire à garder non indiqué"
+        case .keeperMissing: "L'exemplaire gardé a disparu : copie conservée"
+        case .keeperInSameClean: "L'exemplaire gardé serait supprimé lui aussi : copie conservée"
+        case .sameFile: "C'est le même fichier que l'exemplaire gardé (lien physique)"
+        case .notRegularFile: "Ce n'est pas un fichier ordinaire"
+        case .notDownloaded: "Fichier iCloud non téléchargé : non vérifiable"
+        case .contentDiffers: "Le contenu n'est plus identique à l'exemplaire gardé : copie conservée"
         }
     }
 }
@@ -91,6 +110,7 @@ public struct Cleaner: Sendable {
 
     /// Méthode de suppression appliquée à une règle.
     public func method(for rule: Rule) -> RemovalMethod {
+        if rule.check != nil { return .trash }
         if rule.source != nil { return .permanent }
         return allowPermanentDeletion && rule.regenerable ? .permanent : .trash
     }
@@ -114,7 +134,51 @@ public struct Cleaner: Sendable {
             throw .protected(reason)
         }
         guard PathPattern.exists(request.path) else { throw .missing }
+        if rule.check == .duplicateCopy {
+            guard let keeper = request.keeperPath, keeper != request.path else { throw .keeperRequired }
+            guard PathPattern.exists(keeper) else { throw .keeperMissing }
+        }
         return rule
+    }
+
+    /// Contrôle d'une copie (règle `duplicateCopy`), fait juste avant la suppression :
+    /// deux fichiers ordinaires distincts, présents sur ce Mac, de même taille et au contenu
+    /// identique octet par octet ; l'exemplaire gardé ne fait pas partie du même nettoyage.
+    public func verifyCopy(_ request: CleanRequest, removing batch: Set<String>) throws(CleanRefusal) {
+        guard let keeper = request.keeperPath, keeper != request.path else { throw .keeperRequired }
+        guard !batch.contains(keeper) else { throw .keeperInSameClean }
+        var copy = stat(), kept = stat()
+        guard lstat(request.path, &copy) == 0 else { throw .missing }
+        guard lstat(keeper, &kept) == 0 else { throw .keeperMissing }
+        guard (copy.st_mode & S_IFMT) == S_IFREG, (kept.st_mode & S_IFMT) == S_IFREG else { throw .notRegularFile }
+        guard copy.st_dev != kept.st_dev || copy.st_ino != kept.st_ino else { throw .sameFile }
+        let dataless = UInt32(SF_DATALESS)
+        guard copy.st_flags & dataless == 0, kept.st_flags & dataless == 0 else { throw .notDownloaded }
+        guard copy.st_size == kept.st_size else { throw .contentDiffers }
+        guard Self.sameContent(request.path, keeper) else { throw .contentDiffers }
+    }
+
+    /// Compare deux fichiers octet par octet (sans suivre les liens). Faux en cas d'erreur de lecture.
+    static func sameContent(_ a: String, _ b: String) -> Bool {
+        let fa = open(a, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard fa >= 0 else { return false }
+        defer { close(fa) }
+        let fb = open(b, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard fb >= 0 else { return false }
+        defer { close(fb) }
+        let chunk = 1 << 20
+        var bufA = [UInt8](repeating: 0, count: chunk)
+        var bufB = [UInt8](repeating: 0, count: chunk)
+        while true {
+            let na = bufA.withUnsafeMutableBytes { read(fa, $0.baseAddress, chunk) }
+            let nb = bufB.withUnsafeMutableBytes { read(fb, $0.baseAddress, chunk) }
+            guard na >= 0, na == nb else { return false }
+            if na == 0 { return true }
+            let equal = bufA.withUnsafeBytes { pa in
+                bufB.withUnsafeBytes { pb in memcmp(pa.baseAddress, pb.baseAddress, na) == 0 }
+            }
+            guard equal else { return false }
+        }
     }
 
     /// Nettoie les éléments validés et écrit une entrée dans le journal.
@@ -124,6 +188,7 @@ public struct Cleaner: Sendable {
         progress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> JournalEntry {
         var lines: [JournalItem] = []
+        let batch = Set(requests.map(\.path))
         for (index, request) in requests.enumerated() {
             if Task.isCancelled { break }
             progress?(index, requests.count)
@@ -133,6 +198,9 @@ public struct Cleaner: Sendable {
             }
             do {
                 let rule = try validate(request)
+                if rule.check == .duplicateCopy {
+                    try verifyCopy(request, removing: batch)
+                }
                 let method = method(for: rule)
                 var trashedPath: String?
                 switch method {

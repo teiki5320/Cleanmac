@@ -58,10 +58,11 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - [x] **Gros et anciens fichiers** : filtres taille / date / type, aperçu Quick Look
       → 0.5.0 : onglet « Gros fichiers » de la carte, filtres taille / ancienneté / type, aperçu Coup d'œil.
         Reste à valider à l'écran.
-- [ ] **Doublons** : comparaison par taille puis empreinte, choix de l'exemplaire à garder
+- [x] **Doublons** : comparaison par taille puis empreinte, choix de l'exemplaire à garder
       → 0.5.0 : recherche faite (taille, puis SHA-256 du début, puis complet), suggestion de l'exemplaire
-        à garder, copies APFS repérées, aperçu et Finder. En lecture seule : la mise à la Corbeille
-        depuis Cleanmac attend une décision (voir « Décisions »).
+        à garder, copies APFS repérées, aperçu et Finder.
+      → 0.6.0 : choix de l'exemplaire gardé, copies à cocher, écran de vérification, mise à la Corbeille
+        via la règle `doublons.copies` avec revérification octet par octet. Reste à valider à l'écran.
 - [ ] **Instantanés APFS locaux** et espace « purgeable » : affichage et purge (via l'outil d'aide)
 
 ## Phase 4 — Applications
@@ -149,6 +150,16 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   (« dataless ») sont ignorés : les lire les téléchargerait, et ils ne prennent pas de place.
 - Doublons : suggestion de l'exemplaire à garder = hors Téléchargements, puis le plus ancien, puis le chemin
   le plus court. Les copies APFS (drapeau EF_MAY_SHARE_BLOCKS) ne comptent pas dans l'espace « en trop ».
-- Doublons en **lecture seule** pour l'instant : la règle n°1 interdit de supprimer hors règle, et une règle
-  couvrant tout le dossier personnel viderait cette protection de son sens. À trancher avec l'utilisateur.
 - Version 0.5.0 (build 6).
+- Doublons : mise à la Corbeille validée par l'utilisateur, « avec garde-fous ». Règle `doublons.copies`
+  (Rules/doublons.json) d'un nouveau genre, à contrôle `duplicateCopy` : ses chemins sont des dossiers
+  (sans joker) et elle couvre les fichiers qu'ils contiennent, à toute profondeur. Dossiers autorisés :
+  Téléchargements, Vidéos, Musique, Public (hors bibliothèques Musique et TV). Toujours « à vérifier »
+  (rien coché d'office), jamais régénérable : Corbeille uniquement, même si la suppression définitive
+  est activée. Le scanner ignore les règles à contrôle.
+- Doublons, garde-fous au moment du nettoyage : l'exemplaire gardé est nommé dans la demande, doit
+  exister, ne pas être supprimé dans le même nettoyage, être un autre fichier (pas un lien physique),
+  et les deux fichiers ordinaires, présents sur ce Mac (pas « dataless »), doivent être identiques octet
+  par octet. Protections inchangées : Bureau, Documents, Images, dossiers git restent intouchables
+  (ces copies se suppriment depuis le Finder).
+- Version 0.6.0 (build 7).

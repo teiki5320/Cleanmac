@@ -145,7 +145,10 @@ public struct Scanner: Sendable {
 
             for path in pattern.expand(rule: rule) {
                 try Task.checkCancellation()
-                if claimed.contains(where: { ProtectionPolicy.isSameOrInside(path, $0) }) { continue }
+                // Déjà pris par une règle précédente (lui, un parent, ou un enfant : pas de double compte).
+                if claimed.contains(where: { ProtectionPolicy.isSameOrInside(path, $0) || ProtectionPolicy.isSameOrInside($0, path) }) { continue }
+                // Un chemin qui passe par un lien serait refusé au nettoyage : on ne le propose pas.
+                if PathPattern.hasSymlinkedParent(path) { continue }
                 // Corbeilles : seulement ce qui est directement dans une vraie Corbeille (aucun lien suivi).
                 if rule.inTrash, !TrashLocation.isDirectlyInTrash(path, home: policy.home, uid: pattern.uid) { continue }
 

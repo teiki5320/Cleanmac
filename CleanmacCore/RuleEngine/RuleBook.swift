@@ -127,7 +127,7 @@ public struct RuleBook: Sendable {
                         throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "chemin sans jeton d'appli")
                     }
                     // « {bundleID}* » couvrirait d'autres applis (com.foo.app → com.foo.application).
-                    for glob in ["*", "?", "["] where path.contains("}" + glob) || path.contains(glob + "{") {
+                    for glob in ["*", "?", "["] where path.contains("}" + glob) || path.contains(glob + "{") || path.contains("}." + glob) && glob != "[" {
                         throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "joker collé au jeton")
                     }
                 case nil:
@@ -143,6 +143,9 @@ public struct RuleBook: Sendable {
                 }
             }
             if rule.inTrash {
+                guard rule.risk == .review, rule.source == nil else {
+                    throw RuleError.invalidCheck(ruleID: rule.id, reason: "une règle de Corbeille est « à vérifier » (vider est définitif)")
+                }
                 for path in rule.paths {
                     guard path.hasSuffix("/*") else {
                         throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "une règle de Corbeille vise le contenu d'une Corbeille (« …/* »)")

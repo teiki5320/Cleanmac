@@ -77,8 +77,14 @@ final class HelperManager {
 
 enum HelperClientError: LocalizedError {
     case noProxy
+    case timeout
 
-    var errorDescription: String? { "connexion impossible" }
+    var errorDescription: String? {
+        switch self {
+        case .noProxy: "connexion impossible"
+        case .timeout: "pas de réponse dans le délai"
+        }
+    }
 }
 
 /// Client XPC de l'outil d'aide.
@@ -111,6 +117,10 @@ enum HelperClient {
             guard let helper = proxy as? CleanmacHelperProtocol else {
                 once.resume(.failure(HelperClientError.noProxy))
                 return
+            }
+            // L'interface ne reste jamais « en cours » indéfiniment.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 600) {
+                once.resume(.failure(HelperClientError.timeout))
             }
             body(helper) { once.resume($0) }
         }

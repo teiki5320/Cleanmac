@@ -6,7 +6,8 @@ struct CleanmacApp: App {
     @AppStorage(ComfortKeys.menuBar) private var showMenuBar = true
 
     var body: some Scene {
-        WindowGroup("Cleanmac", id: "main") {
+        // Une seule fenêtre : « Ouvrir Cleanmac » (barre des menus) la ramène au lieu d'en créer une autre.
+        Window("Cleanmac", id: "main") {
             RootView()
                 .environment(model)
                 .frame(minWidth: 960, minHeight: 680)

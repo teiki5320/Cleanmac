@@ -9,7 +9,7 @@
       "check": "duplicateCopy",
       "explanation": "Copies identiques d'un fichier gardé ailleurs. Juste avant de mettre une copie à la Corbeille, Cleanmac vérifie que l'exemplaire gardé existe toujours et que les deux contenus sont identiques, octet par octet. Rien n'est supprimé définitivement : tout reste récupérable dans la Corbeille.",
       "paths": ["~/Downloads", "~/Movies", "~/Music", "~/Public"],
-      "excludes": ["~/Music/Music", "~/Music/iTunes", "~/Movies/TV"]
+      "excludes": ["~/Music/Music", "~/Music/iTunes", "~/Music/Audio Music Apps", "~/Movies/TV"]
     }
   ]
 }

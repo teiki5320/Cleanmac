@@ -80,15 +80,17 @@ final class DiskMapModel {
     var focus: DiskNode? { trail.last }
 
     /// Avancement estimé (seulement pour tout le Mac, comparé à l'espace utilisé du disque).
+    /// Espace occupé (hors purgeable), mesuré une fois au lancement de la carte « Tout le Mac ».
+    private var usedAtStart: Int64?
+
     var estimatedFraction: Double? {
-        guard root == .disk, isScanning, let space = DiskSpace.current() else { return nil }
-        let used = space.total - space.free
-        guard used > 0 else { return nil }
+        guard root == .disk, isScanning, let used = usedAtStart, used > 0 else { return nil }
         return min(Double(progress?.bytesFound ?? 0) / Double(used), 0.99)
     }
 
     func start() {
         guard !isScanning else { return }
+        usedAtStart = VolumeSpace.current().map { $0.total - $0.free }
         let root = root
         let path = root.path
         state = .scanning(nil)

@@ -28,9 +28,9 @@ enum CleanPhase {
     }
 }
 
-/// « 1 élément », « 3 éléments ».
+/// « 0 élément », « 1 élément », « 3 éléments » (zéro prend le singulier en français).
 func plural(_ count: Int, _ singular: String, _ pluralForm: String? = nil) -> String {
-    count == 1 ? "1 \(singular)" : "\(count.formatted()) \(pluralForm ?? singular + "s")"
+    count <= 1 ? "\(count) \(singular)" : "\(count.formatted()) \(pluralForm ?? singular + "s")"
 }
 
 extension String {
@@ -137,8 +137,8 @@ struct Pill: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold))
-            .padding(.horizontal, 7)
+            .font(.system(size: 14, weight: .semibold))
+            .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .background(Capsule().fill(color.opacity(0.35)))
     }
@@ -284,13 +284,13 @@ struct CleanReviewSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(sections.filter { !$0.lines.isEmpty }) { section in
-                        VStack(alignment: .leading, spacing: 6) {
+                        LazyVStack(alignment: .leading, spacing: 6) {
                             Label("\(section.title) — \(plural(section.lines.count, "élément")), \(Bytes.text(section.bytes))",
                                   systemImage: section.symbol)
                                 .font(.system(size: 17, weight: .semibold))
-                            ForEach(section.lines.prefix(60)) { line in
+                            ForEach(section.lines) { line in
                                 VStack(alignment: .leading, spacing: 1) {
                                     HStack {
                                         Text(line.name).lineLimit(1).truncationMode(.middle)
@@ -307,9 +307,6 @@ struct CleanReviewSheet: View {
                                     }
                                 }
                                 .font(.system(size: 15))
-                            }
-                            if section.lines.count > 60 {
-                                Text("… et \(section.lines.count - 60) autres").foregroundStyle(.white.opacity(0.6))
                             }
                         }
                     }
@@ -378,7 +375,7 @@ struct CleanFinishedView: View {
             }
             if !trashed.isEmpty {
                 Text((trashed.count == 1 ? "1 élément est" : "\(trashed.count) éléments sont")
-                     + " dans la Corbeille. Videz-la pour libérer l'espace (module Corbeilles).")
+                     + " dans la Corbeille. Videz-la pour libérer l'espace (module « Vider les Corbeilles »).")
                     .font(.title3)
             }
             if !evicted.isEmpty {

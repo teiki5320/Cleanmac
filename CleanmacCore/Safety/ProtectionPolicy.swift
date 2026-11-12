@@ -45,6 +45,8 @@ public struct ProtectionPolicy: Sendable {
         "Library/Keychains",
         "Library/Mobile Documents",   // iCloud Drive : supprimer ici supprime dans iCloud
         "Library/Photos",
+        ".ssh",                       // clés
+        ".gnupg",
     ]
 
     /// Emplacements système protégés d'office.

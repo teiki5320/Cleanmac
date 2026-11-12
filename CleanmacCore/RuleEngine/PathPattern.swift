@@ -144,6 +144,16 @@ public struct PathPattern: Sendable {
         return current.filter { !$0.isEmpty }
     }
 
+    /// Un des dossiers parents est-il (ou passe-t-il par) un lien symbolique ?
+    /// Compare le chemin réel du parent au chemin écrit. Un parent introuvable compte comme un lien.
+    public static func hasSymlinkedParent(_ path: String) -> Bool {
+        let parent = (path as NSString).deletingLastPathComponent
+        guard parent != "/", !parent.isEmpty else { return false }
+        guard let resolved = realpath(parent, nil) else { return true }
+        defer { free(resolved) }
+        return String(cString: resolved) != parent
+    }
+
     static func exists(_ path: String) -> Bool {
         var st = stat()
         return lstat(path, &st) == 0

@@ -28,7 +28,25 @@ struct PurgeableScreen: View {
                     Spacer()
                     PrimaryActionButton(title: model.purging ? "Purge en cours…" : "Purger les instantanés Time Machine",
                                         symbol: "trash", tint: Module.purgeable.palette.mid,
-                                        enabled: !model.purging && model.timeMachineCount > 0) { confirm = true }
+                                        enabled: !model.purging && model.timeMachineCount > 0 && app.helper.status == .enabled) { confirm = true }
+                }
+                if app.helper.status != .enabled {
+                    HStack {
+                        Label("La purge demande l'outil d'aide (droits administrateur) : \(app.helper.statusLabel.lowercased()).",
+                              systemImage: "lock.shield")
+                            .font(.system(size: 15))
+                        Spacer()
+                        if app.helper.status == .requiresApproval {
+                            Button("Autoriser dans les réglages…") { app.helper.openApprovalSettings() }
+                        } else {
+                            Button("Installer l'outil d'aide") { app.helper.install() }
+                        }
+                    }
+                    .controlSize(.large)
+                }
+                if model.timeMachineCount == 0 {
+                    Text("Aucun instantané Time Machine : rien à purger. Ceux des mises à jour de macOS disparaissent seuls.")
+                        .font(.system(size: 14)).foregroundStyle(.white.opacity(0.7))
                 }
                 if let message = model.message {
                     Label(message, systemImage: "info.circle").foregroundStyle(.white.opacity(0.85))
@@ -49,7 +67,7 @@ struct PurgeableScreen: View {
                                              : "Mise à jour de macOS")
                                             .font(.system(size: 15, weight: .medium))
                                         Text(snapshot.isTimeMachine ? "Purgeable" : "Géré par macOS : supprimé seul après la mise à jour")
-                                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+                                            .font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                                     }
                                     Spacer()
                                 }
@@ -70,7 +88,7 @@ struct PurgeableScreen: View {
             Button("Purger") { model.purge() }
             Button("Annuler", role: .cancel) {}
         } message: {
-            Text("Les retours en arrière possibles depuis ces instantanés seront perdus. Vos sauvegardes sur disque externe ne sont pas touchées. Demande l'outil d'aide.")
+            Text("Les retours en arrière possibles depuis ces instantanés seront perdus. Vos sauvegardes sur disque externe ne sont pas touchées.")
         }
     }
 
@@ -78,7 +96,7 @@ struct PurgeableScreen: View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: symbol).font(.system(size: 15)).foregroundStyle(.white.opacity(0.8))
             Text(Bytes.text(bytes)).font(.system(size: 30, weight: .bold).monospacedDigit())
-            Text(help).font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+            Text(help).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,7 +132,7 @@ struct MaintenanceScreen: View {
         let helper = app.helper
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                ScreenHeader(symbol: Module.maintenance.symbol, title: "Maintenance",
+                ScreenHeader(symbol: Module.maintenance.symbol, title: Module.maintenance.title,
                              subtitle: "Outil d'aide : \(helper.statusLabel.lowercased())")
                 if helper.status != .enabled {
                     HStack {
@@ -178,11 +196,12 @@ struct MaintenanceScreen: View {
                 Button(state == .running ? "En cours…" : "Lancer") {
                     if task.needsConfirmation { pending = task } else { model.run(task) }
                 }
+                .accessibilityLabel("Lancer : \(task.title)")
                 .controlSize(.large)
                 .disabled(state == .running)
             }
             if task.helperCommand != nil {
-                Text("Demande l'outil d'aide").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
+                Text("Demande l'outil d'aide").font(.system(size: 13)).foregroundStyle(.white.opacity(0.5))
             }
         }
         .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
@@ -203,20 +222,20 @@ struct MaintenanceScreen: View {
                 GeometryReader { geo in
                     let total = Double(memory.total)
                     HStack(spacing: 0) {
-                        Rectangle().fill(Color(hex: 0xFDE68A)).frame(width: geo.size.width * Double(memory.app) / total)
-                        Rectangle().fill(Color(hex: 0xF97316)).frame(width: geo.size.width * Double(memory.wired) / total)
-                        Rectangle().fill(Color(hex: 0xA3E635)).frame(width: geo.size.width * Double(memory.compressed) / total)
-                        Rectangle().fill(.white.opacity(0.25)).frame(width: geo.size.width * Double(memory.cached) / total)
+                        Rectangle().fill(ThemeColors.memoryApps).frame(width: geo.size.width * Double(memory.app) / total)
+                        Rectangle().fill(ThemeColors.memoryWired).frame(width: geo.size.width * Double(memory.wired) / total)
+                        Rectangle().fill(ThemeColors.memoryCompressed).frame(width: geo.size.width * Double(memory.compressed) / total)
+                        Rectangle().fill(ThemeColors.memoryCached).frame(width: geo.size.width * Double(memory.cached) / total)
                         Rectangle().fill(.white.opacity(0.08))
                     }
                     .clipShape(Capsule())
                 }
                 .frame(height: 14)
                 HStack(spacing: 18) {
-                    legend("Applis", memory.app, Color(hex: 0xFDE68A))
-                    legend("Système", memory.wired, Color(hex: 0xF97316))
-                    legend("Compressée", memory.compressed, Color(hex: 0xA3E635))
-                    legend("Fichiers en cache", memory.cached, .white.opacity(0.4))
+                    legend("Applis", memory.app, ThemeColors.memoryApps)
+                    legend("Système", memory.wired, ThemeColors.memoryWired)
+                    legend("Compressée", memory.compressed, ThemeColors.memoryCompressed)
+                    legend("Fichiers en cache", memory.cached, ThemeColors.memoryCached)
                     Spacer()
                     Text("\(Bytes.text(memory.used)) utilisés sur \(Bytes.text(memory.total))")
                         .font(.system(size: 14).monospacedDigit())
@@ -235,6 +254,7 @@ struct MaintenanceScreen: View {
                     Text(Bytes.text(process.footprint)).font(.system(size: 15, weight: .semibold).monospacedDigit())
                     if model.runningApp(process) != nil {
                         Button("Quitter") { model.quit(process) }
+                            .accessibilityLabel("Quitter \(model.displayName(process))")
                             .help("Demande à l'appli de se fermer (elle peut proposer d'enregistrer)")
                     } else {
                         Color.clear.frame(width: 64, height: 1)

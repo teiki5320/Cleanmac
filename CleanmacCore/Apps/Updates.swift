@@ -58,6 +58,17 @@ public enum Appcast {
     public struct Entry: Sendable, Equatable {
         public let version: String?
         public let shortVersion: String?
+        /// Canal (« beta »…) : absent pour les versions publiques.
+        public var channel: String? = nil
+        public var minimumSystemVersion: String? = nil
+
+        /// Version publique, installable sur ce Mac.
+        public var isEligible: Bool {
+            guard channel?.isEmpty ?? true else { return false }
+            guard let minimum = minimumSystemVersion else { return true }
+            let os = ProcessInfo.processInfo.operatingSystemVersion
+            return !VersionCompare.isNewer(minimum, than: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)")
+        }
     }
 
     final class Parser: NSObject, XMLParserDelegate {
@@ -65,6 +76,8 @@ public enum Appcast {
         private var inItem = false
         private var version: String?
         private var shortVersion: String?
+        private var channel: String?
+        private var minimumSystem: String?
         private var element = ""
         private var text = ""
 
@@ -72,7 +85,7 @@ public enum Appcast {
                     qualifiedName: String?, attributes: [String: String] = [:]) {
             element = qualifiedName ?? name
             text = ""
-            if element == "item" { inItem = true; version = nil; shortVersion = nil }
+            if element == "item" { inItem = true; version = nil; shortVersion = nil; channel = nil; minimumSystem = nil }
             if inItem, element == "enclosure" {
                 version = attributes["sparkle:version"] ?? version
                 shortVersion = attributes["sparkle:shortVersionString"] ?? shortVersion
@@ -86,9 +99,13 @@ public enum Appcast {
             let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if inItem, tag == "sparkle:version", !value.isEmpty { version = value }
             if inItem, tag == "sparkle:shortVersionString", !value.isEmpty { shortVersion = value }
+            if inItem, tag == "sparkle:channel", !value.isEmpty { channel = value }
+            if inItem, tag == "sparkle:minimumSystemVersion", !value.isEmpty { minimumSystem = value }
             if tag == "item" {
                 inItem = false
-                if version != nil || shortVersion != nil { entries.append(Entry(version: version, shortVersion: shortVersion)) }
+                if version != nil || shortVersion != nil {
+                    entries.append(Entry(version: version, shortVersion: shortVersion, channel: channel, minimumSystemVersion: minimumSystem))
+                }
             }
             text = ""
         }
@@ -105,7 +122,7 @@ public enum Appcast {
 
     /// Entrée la plus récente (par numéro de build, sinon par version affichée).
     public static func latest(_ entries: [Entry]) -> Entry? {
-        entries.max { a, b in
+        entries.filter(\.isEligible).max { a, b in
             VersionCompare.isNewer(b.version ?? b.shortVersion ?? "", than: a.version ?? a.shortVersion ?? "")
         }
     }
@@ -181,7 +198,8 @@ public struct UpdateChecker: Sendable {
     public func homebrewUpdates() async throws -> [AppUpdate] {
         guard let brew = Self.brewPath else { return [] }
         let data = try await ToolRunner.run(brew, ["outdated", "--cask", "--greedy", "--json=v2"],
-                                            environment: ["HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1"])
+                                            environment: ["HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1"],
+                                            timeout: 300)
         return try Self.parseBrew(data)
     }
 }

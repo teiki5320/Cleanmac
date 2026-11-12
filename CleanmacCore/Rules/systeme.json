@@ -21,7 +21,6 @@
       "name": "Journaux des applications",
       "category": "systemJunk",
       "risk": "safe",
-      "regenerable": true,
       "explanation": "Historiques techniques écrits par les applications. Utiles seulement pour diagnostiquer un problème.",
       "paths": ["~/Library/Logs/*"],
       "excludes": ["~/Library/Logs/DiagnosticReports"]

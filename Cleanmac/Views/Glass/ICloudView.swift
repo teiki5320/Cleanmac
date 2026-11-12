@@ -31,17 +31,14 @@ struct ICloudScreen: View {
                 toolbar(shown, model: model)
                 ScrollView {
                     LazyVStack(spacing: 6) {
-                        ForEach(shown.prefix(500)) { file in
+                        ForEach(shown) { file in
                             ICloudRow(file: file, model: model) { preview = URL(fileURLWithPath: file.path) }
-                        }
-                        if shown.count > 500 {
-                            Text("… et \(shown.count - 500) fichiers plus petits").foregroundStyle(.white.opacity(0.6))
                         }
                     }
                     .padding(10)
                 }
                 .glassPanel(padding: 6)
-                .quickLookPreview($preview, in: shown.prefix(500).map { URL(fileURLWithPath: $0.path) })
+                .quickLookPreview($preview, in: shown.map { URL(fileURLWithPath: $0.path) })
             }
             Label("Libérer retire la copie locale : le fichier reste dans iCloud, visible dans le Finder, et se retélécharge quand vous l'ouvrez. Rien n'est supprimé.",
                   systemImage: "icloud.and.arrow.up")

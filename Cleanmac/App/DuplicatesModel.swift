@@ -18,7 +18,7 @@ final class DuplicatesModel {
     typealias CleanState = CleanPhase
 
     /// Règle qui autorise la mise à la Corbeille des copies.
-    static let ruleID = "doublons.copies"
+    nonisolated static let ruleID = "doublons.copies"
 
     private(set) var state: State = .idle
     private(set) var cleanState: CleanState = .idle
@@ -75,7 +75,9 @@ final class DuplicatesModel {
                     group.suggestedKeep.map { (group.id, $0.path) }
                 })
                 selection = []
-                blocked = computeBlocked(scan)
+                // Vérifications de chaque fichier (lstat, protections) hors du fil principal.
+                let cleaner = makeCleaner()
+                blocked = await Task.detached(priority: .userInitiated) { Self.computeBlocked(scan, cleaner: cleaner) }.value
                 state = .finished(scan)
             } catch is CancellationError {
                 state = .cancelled
@@ -195,8 +197,8 @@ final class DuplicatesModel {
     }
 
     /// Copies qu'on ne peut pas supprimer d'ici, avec la raison (hors règle, protégé…).
-    private func computeBlocked(_ scan: DuplicateScan) -> [String: String] {
-        guard let cleaner = makeCleaner() else {
+    nonisolated private static func computeBlocked(_ scan: DuplicateScan, cleaner: Cleaner?) -> [String: String] {
+        guard let cleaner else {
             return Dictionary(uniqueKeysWithValues: scan.groups.flatMap(\.files).map { ($0.path, "Règles indisponibles") })
         }
         var result: [String: String] = [:]
@@ -214,7 +216,7 @@ final class DuplicatesModel {
         return result
     }
 
-    private static func reason(_ refusal: CleanRefusal) -> String {
+    nonisolated private static func reason(_ refusal: CleanRefusal) -> String {
         switch refusal {
         case .notMatchingRule: "Hors des dossiers autorisés"
         case let .protected(reason):

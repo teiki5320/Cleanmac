@@ -68,6 +68,10 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
     case appRunning(String)
     case appStillInstalled
     case ownApp
+    case symlinkInPath
+    case appBundleMismatch
+    case appBundleKept
+    case insidePackage
 
     public var description: String {
         switch self {
@@ -90,6 +94,10 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
         case let .appRunning(name): "\(name) est ouverte : quittez-la d'abord"
         case .appStillInstalled: "Une appli portant cet identifiant est installée : ce n'est pas un reste"
         case .ownApp: "Cleanmac ne se désinstalle pas lui-même"
+        case .symlinkInPath: "Le chemin passe par un lien symbolique : refusé"
+        case .appBundleMismatch: "Le paquet ne correspond pas à l'appli choisie"
+        case .appBundleKept: "L'appli n'a pas pu aller à la Corbeille : ses fichiers sont gardés"
+        case .insidePackage: "Fichier rangé dans un paquet (projet, bibliothèque) : refusé"
         }
     }
 }
@@ -126,6 +134,10 @@ public struct Cleaner: Sendable {
 
     /// Méthode de suppression appliquée à une règle.
     public func method(for rule: Rule) -> RemovalMethod {
+        Self.method(for: rule, allowPermanentDeletion: allowPermanentDeletion)
+    }
+
+    public static func method(for rule: Rule, allowPermanentDeletion: Bool) -> RemovalMethod {
         // Vider une Corbeille est forcément définitif (les éléments y sont déjà).
         if rule.inTrash { return .permanent }
         if rule.check != nil { return .trash }
@@ -135,6 +147,10 @@ public struct Cleaner: Sendable {
 
     /// Les éléments de cette règle peuvent-ils être nettoyés avec les réglages actuels ?
     public func canClean(_ rule: Rule) -> Bool {
+        Self.canClean(rule, allowPermanentDeletion: allowPermanentDeletion)
+    }
+
+    public static func canClean(_ rule: Rule, allowPermanentDeletion: Bool) -> Bool {
         rule.source == nil || (allowPermanentDeletion && rule.regenerable)
     }
 
@@ -158,6 +174,12 @@ public struct Cleaner: Sendable {
         if rule.inTrash, !TrashLocation.isDirectlyInTrash(request.path, home: policy.home, uid: pattern.uid) {
             throw .notInTrash
         }
+        // Les contrôles portent sur le chemin écrit : aucun lien ne doit le faire pointer ailleurs.
+        if PathPattern.hasSymlinkedParent(request.path) { throw .symlinkInPath }
+        if rule.check == .duplicateCopy,
+           request.path.split(separator: "/").dropLast().contains(where: { PackageExtensions.isPackage(String($0)) }) {
+            throw .insidePackage
+        }
         if let reason = policy.fullProtection(for: request.path) {
             throw .protected(reason)
         }
@@ -167,6 +189,10 @@ public struct Cleaner: Sendable {
             case .appFiles?:
                 if app.bundleID == Self.ownBundleID { throw .ownApp }
                 if apps.isRunning(bundleID: app.bundleID) { throw .appRunning(app.name) }
+                // Le paquet .app doit bien être celui de l'appli nommée.
+                if request.path.hasSuffix(".app"), AppCatalog.readApp(at: request.path)?.bundleID != app.bundleID {
+                    throw .appBundleMismatch
+                }
             case .appLeftover?:
                 if app.bundleID.hasPrefix("com.apple.") || app.bundleID == Self.ownBundleID { throw .appStillInstalled }
                 if apps.isInstalled(bundleID: app.bundleID) { throw .appStillInstalled }
@@ -232,24 +258,47 @@ public struct Cleaner: Sendable {
     ) async throws -> JournalEntry {
         var lines: [JournalItem] = []
         let batch = Set(requests.map(\.path))
-        for (index, request) in requests.enumerated() {
+        // Désinstallation : le paquet .app d'abord ; s'il reste en place, ses fichiers sont gardés
+        // (sinon l'appli perdrait ses réglages tout en restant installée).
+        let ordered = requests.enumerated().sorted { a, b in
+            let appA = a.element.app != nil && a.element.path.hasSuffix(".app")
+            let appB = b.element.app != nil && b.element.path.hasSuffix(".app")
+            return appA != appB ? appA : a.offset < b.offset
+        }.map(\.element)
+        var keptApps = Set<String>()
+        for (index, request) in ordered.enumerated() {
             if Task.isCancelled { break }
-            progress?(index, requests.count)
+            progress?(index, ordered.count)
             if let rule = rules.rule(id: request.ruleID), let source = rule.source {
                 lines.append(await cleanExternal(request, rule: rule, source: source))
                 continue
             }
+            let knownMethod = rules.rule(id: request.ruleID).map(method(for:)) ?? .trash
             do {
-                let rule = try validate(request)
+                if let app = request.app, keptApps.contains(app.bundleID), !request.path.hasSuffix(".app") {
+                    throw CleanRefusal.appBundleKept
+                }
+                let rule: Rule
+                do {
+                    rule = try validate(request)
+                } catch {
+                    if request.app != nil, request.path.hasSuffix(".app"), let app = request.app { keptApps.insert(app.bundleID) }
+                    throw error
+                }
                 if rule.check == .duplicateCopy {
                     try verifyCopy(request, removing: batch)
                 }
                 let method = method(for: rule)
                 var trashedPath: String?
-                switch method {
-                case .trash: trashedPath = try remover.trash(request.path)
-                case .permanent: try remover.removePermanently(request.path)
-                case .evicted: throw CleanRefusal.notMatchingRule(ruleID: rule.id)   // jamais par le nettoyeur
+                do {
+                    switch method {
+                    case .trash: trashedPath = try remover.trash(request.path)
+                    case .permanent: try remover.removePermanently(request.path)
+                    case .evicted: throw CleanRefusal.notMatchingRule(ruleID: rule.id)   // jamais par le nettoyeur
+                    }
+                } catch {
+                    if let app = request.app, request.path.hasSuffix(".app") { keptApps.insert(app.bundleID) }
+                    throw error
                 }
                 lines.append(JournalItem(
                     path: request.path, ruleID: request.ruleID, bytes: request.bytes,
@@ -257,17 +306,22 @@ public struct Cleaner: Sendable {
             } catch {
                 lines.append(JournalItem(
                     path: request.path, ruleID: request.ruleID, bytes: request.bytes,
-                    method: .trash, succeeded: false,
+                    method: knownMethod, succeeded: false,
                     message: (error as? CleanRefusal)?.description ?? error.localizedDescription,
                     trashedPath: nil))
             }
         }
-        progress?(requests.count, requests.count)
+        progress?(ordered.count, ordered.count)
         guard !lines.isEmpty else {
             return JournalEntry(id: UUID(), date: Date(), items: [])
         }
         let entry = JournalEntry(id: UUID(), date: Date(), items: lines)
-        try journal.append(entry)
+        // Les suppressions sont faites : un journal impossible à écrire ne doit pas les faire passer pour un échec.
+        do {
+            try journal.append(entry)
+        } catch {
+            NSLog("Cleanmac : journal impossible à écrire : %@", error.localizedDescription)
+        }
         return entry
     }
 

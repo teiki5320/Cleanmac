@@ -65,6 +65,18 @@ final class AppsModel {
     var onCleaned: () -> Void = {}
 
     private var sizeTask: Task<Void, Never>?
+    /// Change à chaque lancement ou fermeture d'appli : l'état « ouverte » se remet à jour.
+    private(set) var runningRevision = 0
+    private var observers: [NSObjectProtocol] = []
+
+    init() {
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.runningRevision += 1 }
+            })
+        }
+    }
 
     var isLoading: Bool { phase == .loading }
     var hasLoaded: Bool { phase == .loaded }
@@ -75,13 +87,17 @@ final class AppsModel {
     func start() {
         guard !isLoading, !isCleaning else { return }
         phase = .loading
+        sizes = [:]
         let rules = rules()
         let policy = makePolicy()
+        // Identifiants encore utilisés sans appli installée : applis ouvertes, éléments de démarrage.
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         Task {
             let catalog = AppCatalog()
+            let labels = Set(await LaunchItems().list().map(\.label))
             let (apps, leftovers) = await Task.detached(priority: .userInitiated) {
                 let apps = catalog.installedApps()
-                let known = catalog.knownBundleIDs()
+                let known = catalog.knownBundleIDs().union(running).union(labels)
                 let checker = SystemAppChecker()
                 let leftovers = catalog.leftovers(rules: rules, knownIDs: known, policy: policy,
                                                   isInstalled: { checker.isInstalled(bundleID: $0) })
@@ -115,13 +131,20 @@ final class AppsModel {
     // MARK: Désinstallation
 
     func isRunning(_ app: InstalledApp) -> Bool {
-        !NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).isEmpty
+        _ = runningRevision
+        return !NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).isEmpty
     }
 
     /// Raison pour laquelle une appli ne peut pas être désinstallée d'ici.
     func blockReason(_ app: InstalledApp) -> String? {
         if app.bundleID == Cleaner.ownBundleID { return "C'est Cleanmac" }
         if app.identity.problem != nil { return "Nom ou identifiant inhabituel : passez par le Finder" }
+        // Paquet appartenant au système (installeur, App Store) : la Corbeille demanderait un mot de passe,
+        // et ses réglages partiraient sans elle.
+        let parent = (app.path as NSString).deletingLastPathComponent
+        if !FileManager.default.isWritableFile(atPath: app.path) || !FileManager.default.isWritableFile(atPath: parent) {
+            return "Cette appli appartient au système (installée par un installeur ou l'App Store) : désinstallez-la depuis le Finder, qui demandera votre mot de passe."
+        }
         return nil
     }
 

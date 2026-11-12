@@ -12,8 +12,11 @@ enum HelperConstants {
     static let helperVersion = "2"
 
     /// Exigence de signature imposée à l'appli qui se connecte à l'outil d'aide.
+    /// L'appli ne doit pas autoriser le débogage (`get-task-allow`) : sinon un autre programme pourrait
+    /// s'y attacher et faire lancer les commandes en administrateur.
     static let clientRequirement =
         "identifier \"\(appIdentifier)\" and anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
+        + " and !(entitlement[\"com.apple.security.get-task-allow\"] exists)"
 
     /// Exigence de signature imposée à l'outil d'aide par l'appli.
     static let helperRequirement =

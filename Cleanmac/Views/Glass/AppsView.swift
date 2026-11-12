@@ -10,15 +10,14 @@ struct AppsScreen: View {
     var body: some View {
         @Bindable var model = app.apps
         VStack(alignment: .leading, spacing: 16) {
-            ScreenHeader(symbol: "square.grid.2x2", title: "Applications", subtitle: subtitle(model)) {
-                Picker("Onglet", selection: $model.tab) {
-                    ForEach(AppsModel.Tab.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.large)
-                .fixedSize()
+            ScreenHeader(symbol: "square.grid.2x2", title: "Applications", subtitle: subtitle(model))
+            Picker("Onglet", selection: $model.tab) {
+                ForEach(AppsModel.Tab.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.extraLarge)
+            .frame(maxWidth: 640)
             switch model.tab {
             case .uninstall: UninstallTab(model: model)
             case .leftovers: LeftoversTab(model: model)
@@ -34,8 +33,9 @@ struct AppsScreen: View {
         case .uninstall: "\(plural(model.apps.count, "appli")) dans /Applications et ~/Applications"
         case .leftovers: model.leftovers.isEmpty ? "Aucun reste repéré"
             : "\(plural(model.leftovers.count, "appli supprimée", "applis supprimées")), \(Bytes.text(model.leftovers.reduce(0) { $0 + $1.totalBytes }))"
-        case .startup: "\(plural(model.launchItems.count, "élément")) lancés par macOS"
-        case .updates: model.updatesPhase == .done ? "\(plural(model.updates.count, "mise à jour", "mises à jour")) disponibles" : "Sparkle et Homebrew"
+        case .startup: model.launchItems.count == 1 ? "1 élément lancé par macOS" : "\(model.launchItems.count) éléments lancés par macOS"
+        case .updates: model.updatesPhase != .done ? "Sparkle et Homebrew"
+            : model.updates.count == 1 ? "1 mise à jour disponible" : "\(model.updates.count) mises à jour disponibles"
         }
     }
 }
@@ -84,7 +84,7 @@ private struct UninstallTab: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(app.displayName).font(.system(size: 16, weight: selected ? .semibold : .regular)).lineLimit(1)
                     Text(app.version.map { "version \($0)" } ?? app.bundleID)
-                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+                        .font(.system(size: 13)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 Text(model.sizes[app.path].map(Bytes.text) ?? "…")
@@ -308,7 +308,7 @@ private struct StartupTab: View {
                     if item.runAtLoad { Pill(text: "au démarrage", color: .blue) }
                 }
                 if let program = item.program {
-                    Text(DisplayPath.short(program)).font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+                    Text(DisplayPath.short(program)).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1).truncationMode(.head)
                 }
             }
@@ -333,6 +333,7 @@ private struct StartupTab: View {
 
 private struct UpdatesTab: View {
     let model: AppsModel
+    @State private var copied: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -393,14 +394,24 @@ private struct UpdatesTab: View {
             }
             Spacer()
             if let path = update.appPath {
-                Button("Ouvrir l'appli") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
-                    .help("L'appli propose sa mise à jour elle-même (menu de l'appli › Rechercher les mises à jour).")
-            } else if let token = update.caskToken {
-                Button("Copier la commande") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString("brew upgrade --cask \(token)", forType: .string)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Button("Ouvrir l'appli") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+                        .accessibilityLabel("Ouvrir \(update.name)")
+                    Text("puis menu de l'appli › Rechercher les mises à jour")
+                        .font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                 }
-                .help("brew upgrade --cask \(token)")
+            } else if let token = update.caskToken {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Button(copied == token ? "Commande copiée" : "Copier la commande") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString("brew upgrade --cask \(token)", forType: .string)
+                        copied = token
+                    }
+                    .accessibilityLabel("Copier la commande de mise à jour de \(update.name)")
+                    Text("brew upgrade --cask \(token)")
+                        .font(.system(size: 13, design: .monospaced)).foregroundStyle(.white.opacity(0.6))
+                        .textSelection(.enabled)
+                }
             }
         }
         .controlSize(.large)

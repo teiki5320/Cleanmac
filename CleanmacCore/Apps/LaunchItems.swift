@@ -95,7 +95,8 @@ public struct LaunchItems: Sendable {
               let label = plist["Label"] as? String
         else { return nil }
         let program = (plist["Program"] as? String) ?? (plist["ProgramArguments"] as? [String])?.first
-        let runAtLoad = (plist["RunAtLoad"] as? Bool) ?? false || plist["KeepAlive"] != nil
+        let keepAlive = (plist["KeepAlive"] as? Bool) == true || plist["KeepAlive"] is [String: Any]
+        let runAtLoad = (plist["RunAtLoad"] as? Bool) == true || keepAlive
         return (label, program, runAtLoad)
     }
 

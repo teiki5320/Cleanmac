@@ -9,8 +9,15 @@ public struct ExclusionStore: Sendable {
     }
 
     public func load() -> [String] {
-        guard let data = try? Data(contentsOf: fileURL) else { return [] }
-        return (try? JSONDecoder().decode([String].self, from: data)) ?? []
+        (try? loadStrict()) ?? []
+    }
+
+    /// Lecture qui échoue si le fichier existe mais est illisible : mieux vaut bloquer le nettoyage
+    /// que d'oublier les exclusions de l'utilisateur.
+    public func loadStrict() throws -> [String] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+        let data = try Data(contentsOf: fileURL)
+        return try JSONDecoder().decode([String].self, from: data)
     }
 
     public func save(_ paths: [String]) throws {
@@ -23,11 +30,11 @@ public struct ExclusionStore: Sendable {
     }
 
     public func add(_ path: String) throws {
-        try save(load() + [path])
+        try save(loadStrict() + [path])
     }
 
     public func remove(_ path: String) throws {
-        try save(load().filter { $0 != path })
+        try save(loadStrict().filter { $0 != path })
     }
 }
 

@@ -120,7 +120,7 @@ struct DuplicatesScreen: View {
         }
         .controlSize(.extraLarge)
         .buttonStyle(.borderedProminent)
-        .tint(.purple)
+        .tint(Module.doublons.palette.mid)
         .disabled(count == 0)
     }
 
@@ -129,8 +129,8 @@ struct DuplicatesScreen: View {
             GlassIcon(symbol: "doc.on.doc")
             VStack(alignment: .leading, spacing: 2) {
                 Text("Doublons").font(.system(size: 34, weight: .semibold))
-                Text((scan.groups.isEmpty ? "Aucun doublon" : "\(scan.groups.count) groupes, \(Bytes.text(scan.wastedBytes)) en trop") + " — \(scan.filesExamined.formatted()) fichiers comparés en \(scan.duration.formatted(.units(allowed: [.seconds], width: .abbreviated)))"
-                     + (scan.unreadableCount > 0 ? ", \(scan.unreadableCount.formatted()) illisibles" : ""))
+                Text((scan.groups.isEmpty ? "Aucun doublon" : "\(plural(scan.groups.count, "groupe")), \(Bytes.text(scan.wastedBytes)) en trop") + " — \(plural(scan.filesExamined, "fichier")) comparés en \(scan.duration.formatted(.units(allowed: [.seconds], width: .abbreviated)))"
+                     + (scan.unreadableCount > 0 ? ", \(plural(scan.unreadableCount, "illisible"))" : ""))
                     .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.7))
                     .monospacedDigit()
@@ -223,7 +223,7 @@ private struct FileRow: View {
                         .lineLimit(1)
                         .truncationMode(.head)
                     if isKeeper { badge("à garder", color: .green) }
-                    if selected { badge("Corbeille", color: .purple) }
+                    if selected { badge("Corbeille", color: Module.doublons.palette.light) }
                     if file.mayShareBlocks { badge("copie APFS", color: .teal) }
                 }
                 Text("modifié \(file.modified.formatted(date: .abbreviated, time: .shortened))"
@@ -236,6 +236,7 @@ private struct FileRow: View {
             if !isKeeper {
                 Button("Garder celui-ci") { model.keep(file, in: group) }
                     .controlSize(.large)
+                    .accessibilityLabel("Garder \(DisplayPath.short(file.path))")
                     .help("Garder cet exemplaire à la place de l'autre")
             }
             QuickLookButton(action: preview)
@@ -256,7 +257,7 @@ private struct FileRow: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 24))
-                .foregroundStyle(isKeeper ? Color.green : selected ? Color.purple : .white.opacity(blocked != nil ? 0.4 : 0.8))
+                .foregroundStyle(isKeeper ? Color.green : selected ? Module.doublons.palette.light : .white.opacity(blocked != nil ? 0.4 : 0.8))
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -267,13 +268,13 @@ private struct FileRow: View {
     }
 
     private func rowFill(isKeeper: Bool, selected: Bool) -> Color {
-        if selected { return .purple.opacity(0.18) }
+        if selected { return Module.doublons.palette.light.opacity(0.18) }
         return .white.opacity(isKeeper ? 0.08 : 0)
     }
 
     private func badge(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
             .background(Capsule().fill(color.opacity(0.35)))

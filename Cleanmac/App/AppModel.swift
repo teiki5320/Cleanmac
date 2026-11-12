@@ -48,6 +48,11 @@ final class AppModel {
     private let journal = CleanJournal()
     /// Exclusions de l'utilisateur, relues à chaque scan.
     private(set) var exclusions: [String] = ExclusionStore().load()
+    /// Fichier d'exclusions illisible : tout nettoyage est bloqué tant qu'il n'est pas réparé.
+    private(set) var exclusionsError: String?
+    /// Réglage « suppression définitive » figé à l'ouverture de l'écran de vérification :
+    /// ce qui est montré est exactement ce qui sera fait.
+    private var frozenPermanent: Bool?
 
     init() {
         ComfortKeys.registerDefaults()
@@ -59,14 +64,12 @@ final class AppModel {
         journalEntries = journal.entries()
         // Exclusions relues à chaque usage : la recherche de doublons ne passe pas par `startScan`.
         duplicates.makeCleaner = { [unowned self] in
-            self.exclusions = ExclusionStore().load()
-            return self.makeCleaner()
+            self.reloadExclusions() ? self.makeCleaner() : nil
         }
         duplicates.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
         icloud.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
         apps.makeCleaner = { [unowned self] in
-            self.exclusions = ExclusionStore().load()
-            return self.makeCleaner()
+            self.reloadExclusions() ? self.makeCleaner() : nil
         }
         apps.makePolicy = { [unowned self] in ProtectionPolicy(userExclusions: self.exclusions) }
         apps.rules = { [unowned self] in self.rules?.rules(in: .apps) ?? [] }
@@ -78,18 +81,37 @@ final class AppModel {
 
     // MARK: Exclusions
 
+    /// Relit les exclusions ; un fichier illisible bloque le nettoyage au lieu d'être ignoré.
+    @discardableResult
+    func reloadExclusions() -> Bool {
+        do {
+            exclusions = try ExclusionStore().loadStrict()
+            exclusionsError = nil
+            return true
+        } catch {
+            exclusionsError = "Fichier d'exclusions illisible (\(ExclusionStore().fileURL.path)) : nettoyage bloqué. \(error.localizedDescription)"
+            return false
+        }
+    }
+
     func addExclusion(_ path: String) {
-        try? ExclusionStore().add(path)
-        exclusions = ExclusionStore().load()
+        do { try ExclusionStore().add(path) } catch { exclusionsError = "Exclusion non enregistrée : \(error.localizedDescription)" }
+        reloadExclusions()
     }
 
     func removeExclusion(_ path: String) {
-        try? ExclusionStore().remove(path)
-        exclusions = ExclusionStore().load()
+        do { try ExclusionStore().remove(path) } catch { exclusionsError = "Exclusion non retirée : \(error.localizedDescription)" }
+        reloadExclusions()
     }
 
-    /// Total libéré depuis le début (éléments réussis du journal).
-    var totalFreed: Int64 { journalEntries.reduce(0) { $0 + $1.freedBytes } }
+    func freezeSettingsForReview() { frozenPermanent = allowPermanentDeletion }
+    func unfreezeSettings() { frozenPermanent = nil }
+    private var effectivePermanent: Bool { frozenPermanent ?? allowPermanentDeletion }
+
+    /// Place libérée tout de suite depuis le début (définitif et iCloud).
+    var totalReleased: Int64 { journalEntries.reduce(0) { $0 + $1.releasedBytes } }
+    /// Mis à la Corbeille depuis le début.
+    var totalTrashed: Int64 { journalEntries.reduce(0) { $0 + $1.trashedBytes } }
 
     func refreshFullDiskAccess() {
         fullDiskAccess = FullDiskAccess.status()
@@ -122,11 +144,14 @@ final class AppModel {
 
     /// Lance un scan en lecture seule, de toutes les règles ou des seules catégories demandées.
     func startScan(categories: Set<RuleCategory>? = nil) {
-        guard let rules, !isScanning else { return }
+        guard let rules, !isScanning, !isCleaning else { return }
         let selectedRules = categories.map { wanted in rules.rules.filter { wanted.contains($0.category) } } ?? rules.rules
-        exclusions = ExclusionStore().load()
-        let policy = ProtectionPolicy(userExclusions: exclusions)
         scanCategories = categories
+        guard reloadExclusions() else {
+            scanState = .failed(exclusionsError ?? "Exclusions illisibles")
+            return
+        }
+        let policy = ProtectionPolicy(userExclusions: exclusions)
         scanState = .scanning(nil)
         cleanState = .idle
         scanTask = Task {
@@ -159,24 +184,25 @@ final class AppModel {
 
     /// Nettoyeur configuré avec les réglages actuels (sert aussi aux vérifications d'affichage).
     func makeCleaner() -> Cleaner? {
-        rules.map {
+        guard exclusionsError == nil else { return nil }
+        return rules.map {
             Cleaner(
                 rules: $0,
                 policy: ProtectionPolicy(userExclusions: exclusions),
                 journal: journal,
-                allowPermanentDeletion: allowPermanentDeletion)
+                allowPermanentDeletion: effectivePermanent)
         }
     }
 
     /// L'élément peut-il être nettoyé avec les réglages actuels ?
     func canClean(_ item: ScanItem) -> Bool {
-        guard let rule = rule(for: item), let cleaner = makeCleaner() else { return false }
-        return cleaner.canClean(rule)
+        guard let rule = rule(for: item) else { return false }
+        return Cleaner.canClean(rule, allowPermanentDeletion: effectivePermanent)
     }
 
     func method(for item: ScanItem) -> RemovalMethod {
-        guard let rule = rule(for: item), let cleaner = makeCleaner() else { return .trash }
-        return cleaner.method(for: rule)
+        guard let rule = rule(for: item) else { return .trash }
+        return Cleaner.method(for: rule, allowPermanentDeletion: effectivePermanent)
     }
 
     func isSelected(_ item: ScanItem) -> Bool {
@@ -211,7 +237,10 @@ final class AppModel {
 
     /// Nettoie les éléments cochés (après l'écran de vérification).
     func cleanSelection() {
-        guard !isCleaning, let cleaner = makeCleaner() else { return }
+        guard !isCleaning, reloadExclusions(), let cleaner = makeCleaner() else {
+            if let exclusionsError { cleanState = .failed(exclusionsError) }
+            return
+        }
         let requests = selectedItems.map(CleanRequest.init)
         guard !requests.isEmpty else { return }
         cleanState = .cleaning(done: 0, total: requests.count)

@@ -26,7 +26,7 @@ public enum RuleCategory: String, Codable, Sendable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .systemJunk: "Fichiers système inutiles"
+        case .systemJunk: "Fichiers système"
         case .developer: "Développeur"
         case .mail: "Mail"
         case .trash: "Corbeilles"

@@ -35,7 +35,7 @@ private struct SettingsSection<Content: View>: View {
             content
             if let footer {
                 Text(footer)
-                    .font(.callout)
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -127,15 +127,20 @@ private struct ComfortSettings: View {
                         Text("Dernière analyse : \(last.formatted(date: .long, time: .shortened)) — \(Bytes.text(comfort.lastScheduledBytes)) trouvés")
                             .foregroundStyle(.secondary)
                     }
+                    if let message = comfort.scanMessage {
+                        Label(message, systemImage: "info.circle").foregroundStyle(.secondary)
+                    }
                     HStack {
                         Toggle("Ouvrir Cleanmac à la connexion", isOn: Binding(
                             get: { comfort.launchAtLogin },
                             set: { comfort.setLaunchAtLogin($0) }))
                             .toggleStyle(.switch)
                         Spacer()
-                        Button("Analyser maintenant") {
+                        if comfort.isScanning { ProgressView().controlSize(.small) }
+                        Button(comfort.isScanning ? "Analyse…" : "Analyser maintenant") {
                             Task { await comfort.runScheduledScan() }
                         }
+                        .disabled(comfort.isScanning)
                     }
                     if let message = comfort.loginMessage {
                         Text(message).foregroundStyle(.orange)
@@ -156,6 +161,11 @@ private struct ExclusionSettings: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Dossiers et fichiers exclus")
                 .font(.title3.weight(.semibold))
+            if let error = model.exclusionsError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text("Cleanmac ne propose ni ne supprime jamais rien dans ces emplacements, en plus des protections d'office (Bureau, Documents, Images, Messages, trousseaux, photothèque, iCloud Drive, dossiers git).")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -169,6 +179,7 @@ private struct ExclusionSettings: View {
                         Text(DisplayPath.short(path)).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Button("Retirer") { model.removeExclusion(path) }
+                            .accessibilityLabel("Retirer l'exclusion \(DisplayPath.short(path))")
                     }
                     .font(.title3)
                     .padding(.vertical, 4)
@@ -202,6 +213,7 @@ private struct ExclusionSettings: View {
 
 private struct AccessSettings: View {
     @Environment(AppModel.self) private var model
+    @State private var confirmUninstall = false
 
     var body: some View {
         let helper = model.helper
@@ -230,10 +242,10 @@ private struct AccessSettings: View {
                         switch helper.status {
                         case .enabled:
                             Button("Tester la connexion") { Task { await helper.ping() } }
-                            Button("Désinstaller") { Task { await helper.uninstall() } }
+                            Button("Désinstaller…") { confirmUninstall = true }
                         case .requiresApproval:
                             Button("Ouvrir les réglages") { helper.openApprovalSettings() }
-                            Button("Désinstaller") { Task { await helper.uninstall() } }
+                            Button("Désinstaller…") { confirmUninstall = true }
                         default:
                             Button("Installer") { helper.install() }
                         }
@@ -249,6 +261,12 @@ private struct AccessSettings: View {
                 }
             }
             .padding(20)
+        }
+        .confirmationDialog("Désinstaller l'outil d'aide ?", isPresented: $confirmUninstall) {
+            Button("Désinstaller", role: .destructive) { Task { await model.helper.uninstall() } }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Purger les instantanés, vider le cache DNS, réindexer Spotlight et libérer la mémoire ne seront plus possibles jusqu'à sa réinstallation.")
         }
     }
 }

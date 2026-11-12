@@ -45,7 +45,7 @@ final class PurgeableModel {
             defer { purging = false }
             helper.refresh()
             guard helper.status == .enabled else {
-                message = "Il faut l'outil d'aide pour purger les instantanés : installez-le dans Réglages › Accès et outil d'aide."
+                message = "Il faut l'outil d'aide pour purger les instantanés : installez-le dans Réglages › Accès."
                 return
             }
             do {

@@ -49,6 +49,11 @@ public struct VolumeSpace: Sendable, Equatable {
     /// Espace que macOS libère de lui-même au besoin (instantanés, caches du système, iCloud optimisé).
     public var purgeable: Int64 { max(0, available - free) }
 
+    /// Nom affiché du disque de démarrage (« Macintosh HD » par défaut).
+    public static var startupVolumeName: String {
+        (try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeLocalizedNameKey]))?.volumeLocalizedName ?? "Macintosh HD"
+    }
+
     public static func current(path: String = "/") -> VolumeSpace? {
         let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys),
@@ -148,7 +153,7 @@ public enum ProcessList {
             guard ok else { continue }
             var nameBuffer = [CChar](repeating: 0, count: 1024)
             proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
-            let name = String(cString: nameBuffer)
+            let name = String(decoding: nameBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             result.append(ProcessMemory(pid: pid, name: name.isEmpty ? "Processus \(pid)" : name,
                                         footprint: Int64(usage.ri_phys_footprint)))
         }
@@ -162,6 +167,7 @@ public enum UserMaintenance {
 
     /// Reconstruit la base des services de lancement (« Ouvrir avec », icônes, applis par défaut).
     public static func rebuildLaunchServices() async throws {
-        _ = try await ToolRunner.run(lsregister, ["-r", "-domain", "local", "-domain", "system", "-domain", "user"])
+        _ = try await ToolRunner.run(lsregister, ["-r", "-domain", "local", "-domain", "system", "-domain", "user"],
+                                 timeout: 900)
     }
 }

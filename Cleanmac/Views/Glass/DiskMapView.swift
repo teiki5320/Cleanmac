@@ -53,8 +53,8 @@ struct DiskMapScreen: View {
             GlassIcon(symbol: "chart.pie")
             VStack(alignment: .leading, spacing: 2) {
                 Text("Carte du disque").font(.system(size: 34, weight: .semibold))
-                Text("\(Bytes.text(map.root.allocatedBytes)) — \(map.root.fileCount.formatted()) fichiers, lus en \(map.duration.formatted(.units(allowed: [.seconds], width: .abbreviated)))"
-                     + (map.unreadableCount > 0 ? ", \(map.unreadableCount.formatted()) illisibles" : ""))
+                Text("\(Bytes.text(map.root.allocatedBytes)) — \(plural(map.root.fileCount, "fichier")), lus en \(map.duration.formatted(.units(allowed: [.seconds], width: .abbreviated)))"
+                     + (map.unreadableCount > 0 ? ", \(plural(map.unreadableCount, "illisible"))" : ""))
                     .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.7))
                     .monospacedDigit()
@@ -446,7 +446,7 @@ private struct LargeFilesList: View {
             .fixedSize()
             Text(shown.isEmpty
                  ? "Aucun fichier de plus de 50 Mo ne correspond dans ce dossier."
-                 : "\(shown.count) fichiers, \(Bytes.text(shown.reduce(0) { $0 + $1.allocatedBytes })) au total")
+                 : "\(plural(shown.count, "fichier")), \(Bytes.text(shown.reduce(0) { $0 + $1.allocatedBytes })) au total")
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.7))
             ScrollView {
@@ -479,7 +479,7 @@ private struct LargeFilesList: View {
                         .lineLimit(1)
                     if old {
                         Text("ancien")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(Capsule().fill(Color.orange.opacity(0.35)))
@@ -502,39 +502,41 @@ private struct LargeFilesList: View {
 
 /// Bouton « Aperçu » (Coup d'œil).
 struct QuickLookButton: View {
+    var name: String?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "eye")
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 40, height: 40)
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: 44, height: 44)
                 .background(.white.opacity(0.1), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .help("Aperçu")
-        .accessibilityLabel("Aperçu")
+        .accessibilityLabel(name.map { "Aperçu de \($0)" } ?? "Aperçu")
     }
 }
 
 /// Bouton « Afficher dans le Finder ».
 struct FinderButton: View {
     let path: String
+    var title = "Afficher dans le Finder"
 
     var body: some View {
         Button {
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
         } label: {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 40, height: 40)
+            Image(systemName: "folder")
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: 44, height: 44)
                 .background(.white.opacity(0.1), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help("Afficher dans le Finder")
-        .accessibilityLabel("Afficher dans le Finder")
+        .help(title)
+        .accessibilityLabel("\(title) : \((path as NSString).lastPathComponent)")
     }
 }
 

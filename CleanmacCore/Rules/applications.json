@@ -12,7 +12,7 @@
         "/Applications/{appName}.app",
         "~/Applications/{appName}.app",
         "~/Library/Preferences/{bundleID}.plist",
-        "~/Library/Preferences/ByHost/{bundleID}.*.plist",
+        "~/Library/Preferences/ByHost/{bundleID}.[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f].plist",
         "~/Library/Caches/{bundleID}",
         "~/Library/Caches/{appName}",
         "~/Library/HTTPStorages/{bundleID}",
@@ -36,7 +36,6 @@
         "~/Library/Application Support/{bundleID}",
         "~/Library/Application Support/{appName}",
         "~/Library/Containers/{bundleID}",
-        "~/Library/Group Containers/*.{bundleID}",
         "~/Library/LaunchAgents/{bundleID}.plist"
       ]
     },

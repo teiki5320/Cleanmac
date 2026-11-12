@@ -14,7 +14,7 @@ struct HistoryScreen: View {
                 symbol: "clock.arrow.circlepath",
                 title: "Historique",
                 subtitle: entries.isEmpty ? "Aucun nettoyage pour l'instant"
-                    : "\(plural(entries.count, "nettoyage")) — \(Bytes.text(model.totalFreed)) traités au total")
+                    : "\(plural(entries.count, "nettoyage")) — \(Bytes.text(model.totalReleased)) libérés tout de suite, \(Bytes.text(model.totalTrashed)) mis à la Corbeille")
             if entries.isEmpty {
                 EmptyStatePanel(symbol: "tray", title: "Rien encore",
                                 detail: "Chaque nettoyage, désinstallation ou libération iCloud apparaîtra ici, avec la date, les éléments et la place libérée.")
@@ -130,15 +130,14 @@ private struct ItemLine: View {
                     .font(.system(size: 15))
                     .lineLimit(1).truncationMode(.head)
                 Text(([ruleName, item.succeeded ? item.method.label : item.message].compactMap { $0 }).joined(separator: " — "))
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(2)
             }
             Spacer()
             Text(Bytes.text(item.bytes)).font(.system(size: 14).monospacedDigit()).foregroundStyle(.white.opacity(0.7))
             if let trashed = item.trashedPath, FileManager.default.fileExists(atPath: trashed) {
-                FinderButton(path: trashed)
-                    .help("Afficher dans la Corbeille")
+                FinderButton(path: trashed, title: "Afficher dans la Corbeille")
             }
         }
         .help(item.path)

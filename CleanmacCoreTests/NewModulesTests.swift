@@ -78,7 +78,7 @@ struct TrashTests {
 struct AppRulesTests {
     let files = Rule(id: "applications.appli", name: "Appli", category: .apps, risk: .safe, explanation: "x",
                      paths: ["~/Applications/{appName}.app", "~/Library/Preferences/{bundleID}.plist",
-                             "~/Library/Preferences/ByHost/{bundleID}.*.plist"], check: .appFiles)
+                             "~/Library/Preferences/ByHost/{bundleID}.[0-9A-F]*.plist"], check: .appFiles)
     let leftover = Rule(id: "applications.restes", name: "Restes", category: .apps, risk: .review, explanation: "x",
                         paths: ["~/Library/Caches/{bundleID}", "~/Library/Preferences/{bundleID}.plist"], check: .appLeftover)
     let app = AppIdentity(bundleID: "com.exemple.Truc", name: "Truc")
@@ -124,6 +124,8 @@ struct AppRulesTests {
     func uninstallTrashes() async throws {
         let home = try FakeHome()
         let bundle = try home.dir("Applications/Truc.app/Contents")
+        let info = try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": "com.exemple.Truc"], format: .xml, options: 0)
+        try info.write(to: URL(fileURLWithPath: bundle + "/Info.plist"))
         let prefs = try home.file("Library/Preferences/com.exemple.Truc.plist")
         let remover = RecordingRemover()
         let cleaner = try cleaner(home, remover: remover)

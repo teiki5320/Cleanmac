@@ -19,13 +19,13 @@ struct MenuBarView: View {
             }
             if let space, space.total > 0 {
                 let low = space.available < Int64(threshold) * 1_000_000_000
-                gauge(title: "Macintosh HD",
+                gauge(title: VolumeSpace.startupVolumeName,
                       value: "\(Bytes.text(space.available)) disponibles",
                       fraction: 1 - Double(space.available) / Double(space.total),
                       color: low ? .orange : .teal)
                 if space.purgeable > 0 {
                     Text("dont \(Bytes.text(space.purgeable)) purgeables par macOS")
-                        .font(.callout).foregroundStyle(.secondary)
+                        .font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 if low {
                     Label("Moins de \(threshold) Go disponibles", systemImage: "exclamationmark.triangle.fill")
@@ -38,9 +38,10 @@ struct MenuBarView: View {
                       fraction: Double(memory.used) / Double(memory.total),
                       color: memory.pressure == .normal ? .green : memory.pressure == .warning ? .yellow : .red)
             }
-            if model.totalFreed > 0 {
-                Text("Libéré avec Cleanmac : \(Bytes.text(model.totalFreed))")
-                    .font(.callout).foregroundStyle(.secondary)
+            if model.totalReleased > 0 || model.totalTrashed > 0 {
+                Text("Avec Cleanmac : \(Bytes.text(model.totalReleased)) libérés, \(Bytes.text(model.totalTrashed)) mis à la Corbeille")
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Divider()
             Button {
@@ -48,14 +49,17 @@ struct MenuBarView: View {
                 NSApp.activate()
             } label: {
                 Label("Ouvrir Cleanmac", systemImage: "macwindow").frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6).contentShape(Rectangle())
             }
             SettingsLink {
                 Label("Réglages…", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6).contentShape(Rectangle())
             }
             Button {
                 NSApp.terminate(nil)
             } label: {
                 Label("Quitter Cleanmac", systemImage: "power").frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6).contentShape(Rectangle())
             }
         }
         .buttonStyle(.plain)

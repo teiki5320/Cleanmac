@@ -197,6 +197,8 @@ struct MainWindowView: View {
 // MARK: Barre latérale
 
 private struct Sidebar: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var selection: Module
     let openSettings: () -> Void
 
@@ -208,12 +210,28 @@ private struct Sidebar: View {
                     ForEach(Module.cleaning) { row($0) }
                     sectionTitle("Espace et applis").padding(.top, 12)
                     ForEach(Module.spaceAndApps) { row($0) }
-                    sectionTitle("Entretien").padding(.top, 12)
+                    sectionTitle("Soin du Mac").padding(.top, 12)
                     ForEach(Module.care) { row($0) }
                 }
             }
             .scrollIndicators(.never)
             Spacer(minLength: 8)
+            if model.fullDiskAccess != .granted {
+                Button {
+                    NSWorkspace.shared.open(FullDiskAccess.settingsURL)
+                } label: {
+                    Label("Accès complet au disque non accordé : analyses incomplètes", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Ouvrir Réglages système › Confidentialité › Accès complet au disque")
+            }
             DiskGauge()
             Button(action: openSettings) {
                 Label("Réglages", systemImage: "gearshape")
@@ -240,7 +258,7 @@ private struct Sidebar: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text.uppercased())
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .tracking(1)
             .foregroundStyle(.white.opacity(0.6))
             .padding(.horizontal, 12)
@@ -250,7 +268,7 @@ private struct Sidebar: View {
     private func row(_ module: Module) -> some View {
         let selected = module == selection
         return Button {
-            withAnimation(Theme.moduleTransition) { selection = module }
+            withAnimation(reduceMotion ? nil : Theme.moduleTransition) { selection = module }
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: module.symbol)
@@ -262,7 +280,6 @@ private struct Sidebar: View {
                     .fontWeight(selected ? .semibold : .medium)
                     .foregroundStyle(selected ? .white : .white.opacity(0.85))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 4)
             }
             .padding(.vertical, 10)
@@ -294,21 +311,20 @@ private struct DiskGauge: View {
         if let space = DiskSpace.current(), space.total > 0 {
             let used = 1 - Double(space.free) / Double(space.total)
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Macintosh HD")
-                    Spacer(minLength: 4)
-                    Text("\(Bytes.text(space.free)) libres")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(VolumeSpace.startupVolumeName)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text("\(Bytes.text(space.free)) disponibles")
+                        .font(.system(size: 15, weight: .semibold))
                         .monospacedDigit()
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
                 }
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.75))
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(.white.opacity(0.12))
                         Capsule()
-                            .fill(LinearGradient(colors: [Color(hex: 0x5EEAD4), used > 0.9 ? Color(hex: 0xF97316) : Color(hex: 0x38BDF8)],
+                            .fill(LinearGradient(colors: [ThemeColors.diskStart, used > 0.9 ? ThemeColors.diskAlert : ThemeColors.diskEnd],
                                                  startPoint: .leading, endPoint: .trailing))
                             .frame(width: geo.size.width * used)
                     }
@@ -374,7 +390,10 @@ private struct InfoPanel: View {
                 } else if module == .corbeilles {
                     VStack(alignment: .leading, spacing: 12) {
                         PhotosTrashButton()
-                        statusLabel(cancelled: false, failure: nil)
+                        Text("Dans Photos : barre latérale › Supprimés récemment › Tout supprimer.")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white.opacity(0.7))
+                        ruleScanStatus
                     }
                     .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
                 } else if module == .icloud {
@@ -386,6 +405,8 @@ private struct InfoPanel: View {
                                 failure: { if case let .failed(message) = model.purgeable.phase { return message }; return nil }())
                         .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
                 } else if module.scope != nil {
+                    VStack(alignment: .leading, spacing: 12) {
+                    ruleScanStatus
                     Button(action: openSettings) {
                         Text("Réglages du nettoyage")
                             .font(.system(size: 16, weight: .semibold))
@@ -395,6 +416,7 @@ private struct InfoPanel: View {
                             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.2), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
+                    }
                     .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
                 }
             }
@@ -402,6 +424,17 @@ private struct InfoPanel: View {
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { appeared = true }
+    }
+
+    /// Erreur des règles, ou analyse arrêtée / en échec, pour les modules à règles.
+    @ViewBuilder
+    private var ruleScanStatus: some View {
+        if let error = model.rulesError {
+            statusLabel(cancelled: false, failure: "Règles non chargées : \(error)")
+        } else if module.scope?.categories == model.scanCategories {
+            statusLabel(cancelled: { if case .cancelled = model.scanState { return true }; return false }(),
+                        failure: { if case let .failed(message) = model.scanState { return message }; return nil }())
+        }
     }
 
     /// Message après une carte annulée ou en échec.
@@ -576,6 +609,6 @@ struct PhotosTrashButton: View {
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.2), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .help("Dans Photos : barre latérale › Supprimés récemment › Tout supprimer")
+        .accessibilityHint("Dans Photos : barre latérale, Supprimés récemment, Tout supprimer")
     }
 }

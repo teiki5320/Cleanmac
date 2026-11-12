@@ -184,7 +184,7 @@ public protocol ICloudEvicting: Sendable {
     func evict(_ path: String) async throws
 }
 
-/// Libération via `FileManager` (puis `brctl evict` en secours).
+/// Libération via `FileManager` (sans secours : en cas de refus, le fichier reste sur le Mac).
 public struct SystemICloudEvictor: ICloudEvicting {
     public init() {}
 
@@ -194,11 +194,7 @@ public struct SystemICloudEvictor: ICloudEvicting {
     }
 
     public func evict(_ path: String) async throws {
-        do {
-            try FileManager.default.evictUbiquitousItem(at: URL(fileURLWithPath: path))
-        } catch {
-            _ = try await ToolRunner.run("/usr/bin/brctl", ["evict", path])
-        }
+        try FileManager.default.evictUbiquitousItem(at: URL(fileURLWithPath: path))
     }
 }
 
@@ -231,7 +227,10 @@ public struct ICloudEvictionService: Sendable {
         var st = stat()
         guard lstat(path, &st) == 0 else { throw .missing }
         let type = st.st_mode & S_IFMT
-        guard type == S_IFREG || type == S_IFDIR else { throw .outsideICloud }
+        // Fichiers ordinaires, ou paquets connus (traités comme un fichier) ; jamais un dossier entier.
+        let isPackage = type == S_IFDIR && PackageExtensions.isPackage((path as NSString).lastPathComponent)
+        guard type == S_IFREG || isPackage else { throw .outsideICloud }
+        guard (path as NSString).deletingLastPathComponent != root else { throw .outsideICloud }
         guard st.st_flags & UInt32(SF_DATALESS) == 0 else { throw .alreadyEvicted }
         guard evictor.isUploaded(path) else { throw .notUploaded }
     }

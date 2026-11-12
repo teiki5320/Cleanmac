@@ -12,6 +12,7 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - [ ] Installation de l'outil d'aide privilégié (`SMAppService`) + XPC avec commandes autorisées
       → codé, paquet et signatures vérifiés ; reste à l'installer, l'autoriser dans
         Réglages système › Général › Ouverture et extensions, puis « Tester la connexion »
+        (Réglages › Accès). Seule étape qui demande l'utilisateur : macOS exige son autorisation.
 - [x] Moteur de règles : chargement de `Rules/*.json`, catégories, niveaux de risque
 - [x] Moteur de scan : parcours asynchrone, calcul des tailles réelles (espace alloué), annulation
 - [x] Moteur de nettoyage : Corbeille par défaut, journal, exclusions
@@ -26,7 +27,7 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - [x] Maquette validée par l'utilisateur : style « verre » (maquette n°10 de la toile
       « Cleanmac — pistes de design »), pour tous les modules
 - [x] Fichier de thème : couleurs, dégradés par module, typographie, espacements
-      → `Cleanmac/Theme/Theme.swift` (0.3.0), étendu aux 15 modules (0.7.0)
+      → `Cleanmac/Theme/Theme.swift` (0.3.0), étendu aux 12 modules (0.7.0), couleurs des jauges comprises (0.8.0)
 - [x] Fenêtre principale : barre latérale translucide + zone de contenu
       → `MainWindowView.swift` ; trois sections (Nettoyage, Espace et applis, Entretien), défilante (0.7.0)
 - [x] Composants : gros bouton de scan animé, anneau de progression, cartes de résultat,
@@ -74,7 +75,8 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
       → 0.7.0 : règles à jetons `applications.appli` (sûr) et `applications.donnees` (à vérifier)
 - [x] **Restes** d'applis déjà supprimées → 0.7.0 : règle `applications.restes`
 - [x] **Démarrage** : éléments de connexion et agents `launchd`, activer / désactiver
-      → 0.7.0 : vos agents (`launchctl enable/disable`) ; ceux du système en lecture seule
+      → 0.7.0 : vos agents (`launchctl enable/disable`) ; ceux du système en lecture seule ; les éléments
+        de connexion de macOS (gérés par le système) s'ouvrent dans Réglages système
 - [x] **Mises à jour** : liste des applis qui ont une nouvelle version (Sparkle, Homebrew Cask)
       → 0.7.0 : lecture seule (flux Sparkle, `brew outdated --cask --greedy`)
 
@@ -193,3 +195,31 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - Confort : réglages `barreDesMenus`, `alerteEspace`, `seuilAlerteGo` (15 Go), `nettoyageProgramme`.
   L'analyse programmée ne parcourt que les règles « sûres » et ne supprime jamais rien : elle notifie.
 - Tailles affichées toujours en unités françaises (« Go », « ko »).
+- Audit (0.8.0), trois relectures indépendantes (sécurité, justesse, interface), corrections :
+  - Désinstallation tout ou rien : le paquet .app passe en premier ; s'il reste en place, ses fichiers
+    sont gardés. Applis appartenant au système (root : installeurs, App Store) refusées d'ici : Finder.
+    Le paquet doit porter l'identifiant de l'appli nommée (relu dans son Info.plist).
+  - Aucun lien symbolique dans les dossiers parents d'un élément (scan et nettoyage) : sinon les
+    protections, qui portent sur le chemin écrit, pourraient être contournées.
+  - Un chemin qui contient un chemin déjà pris par une règle n'est plus proposé (plus de double compte).
+  - ByHost : seulement `{bundleID}.<UUID matériel>.plist` (pas les variantes Canary, Beta…) ;
+    conteneurs partagés (`Group Containers`) retirés de la désinstallation.
+  - Règles de Corbeille obligatoirement « à vérifier » ; journaux non régénérables ; `~/.ssh` et
+    `~/.gnupg` protégés ; doublons refusés dans un paquet (projets Logic, iMovie…).
+  - iCloud : jamais un dossier entier ; plus de secours `brctl evict`.
+  - Journal : fichier illisible mis de côté, écritures sérialisées, un échec d'écriture ne fait plus
+    passer un nettoyage réussi pour un échec. Exclusions illisibles : nettoyage bloqué.
+  - Réglage « suppression définitive » figé pendant l'écran de vérification.
+  - Outils lancés (`ToolRunner`) annulables et bornés dans le temps ; outil d'aide : délai de 10 min.
+  - Outil d'aide : refuse une appli débogable (`get-task-allow`) ; l'appli est signée sans ce droit
+    (`CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`).
+  - Mises à jour : versions bêta et incompatibles ignorées. Restes : applis ouvertes et éléments de
+    démarrage écartés.
+  - Interface : erreurs d'analyse affichées, bandeau si l'Accès complet au disque manque, place
+    « libérée » (définitif, iCloud) distincte de « mise à la Corbeille », chemins visibles sans survol,
+    listes complètes, étiquettes en 14 pt, textes de 13 pt au moins, boutons de 44 pt, libellés VoiceOver.
+- Noms propres à Cleanmac : « Vider les Corbeilles », « Entretien » (section « Soin du Mac »).
+- La fenêtre principale reste toujours sombre (style verre) ; Réglages et barre des menus suivent le
+  mode clair ou sombre du système.
+- Un projet git mis à la Corbeille reste protégé : Cleanmac ne vide pas cet élément (le Finder le peut).
+- Version 0.8.0 (build 9).

@@ -47,7 +47,9 @@ struct ResultsView: View {
             selectionBar
         }
         .foregroundStyle(.white)
-        .sheet(isPresented: $showReview) { review }
+        .sheet(isPresented: $showReview, onDismiss: { model.unfreezeSettings() }) {
+            review.onAppear { model.freezeSettingsForReview() }
+        }
     }
 
     private var selectionBar: some View {
@@ -74,7 +76,9 @@ struct ResultsView: View {
         let emptiesTrash = permanent.contains { model.rule(for: $0)?.inTrash == true }
         func lines(_ list: [ScanItem]) -> [ReviewLine] {
             list.sorted { $0.allocatedBytes > $1.allocatedBytes }.map {
-                ReviewLine(id: $0.path, name: $0.name, detail: model.rule(for: $0)?.name, bytes: $0.allocatedBytes, symbol: "tag")
+                ReviewLine(id: $0.path, name: $0.name,
+                           detail: $0.isExternal ? model.rule(for: $0)?.name : DisplayPath.short($0.path),
+                           bytes: $0.allocatedBytes, symbol: $0.isExternal ? "tag" : "folder")
             }
         }
         var notes: [String] = []
@@ -89,7 +93,7 @@ struct ResultsView: View {
             notes: notes,
             warning: emptiesTrash ? "Vider une Corbeille est définitif : ces éléments ne seront plus récupérables."
                 : permanent.isEmpty ? nil : "Les éléments « supprimés définitivement » ne passent pas par la Corbeille.",
-            confirmTitle: "Nettoyer \(Bytes.text(model.selectedBytes))",
+            confirmTitle: (emptiesTrash ? "Vider définitivement " : "Nettoyer ") + Bytes.text(model.selectedBytes),
             phase: model.cleanState,
             onConfirm: { model.cleanSelection() },
             onClose: { model.dismissCleanResult() })
@@ -126,7 +130,7 @@ struct RuleGroup: View {
                         RiskBadge(risk: rule.risk)
                         if rule.inTrash { Pill(text: "définitif", color: .orange) }
                         Spacer()
-                        Text("\(items.count)").foregroundStyle(.white.opacity(0.6))
+                        Text(plural(items.count, "élément")).font(.system(size: 15)).foregroundStyle(.white.opacity(0.6))
                         Text(Bytes.text(items.reduce(0) { $0 + $1.allocatedBytes }))
                             .font(.system(size: 18).monospacedDigit())
                     }
@@ -148,12 +152,9 @@ struct RuleGroup: View {
                         .foregroundStyle(.orange)
                         .padding(.leading, 52)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(sorted.prefix(100)) { item in
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(sorted) { item in
                         ItemRow(item: item, palette: palette)
-                    }
-                    if items.count > 100 {
-                        Text("… et \(items.count - 100) autres").foregroundStyle(.white.opacity(0.6))
                     }
                 }
                 .padding(.leading, 44)
@@ -183,6 +184,10 @@ struct ItemRow: View {
                 Text(item.name).font(.system(size: 16)).lineLimit(1).truncationMode(.middle)
                 if let detail = item.detail {
                     Text(detail).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
+                }
+                if !item.isExternal {
+                    Text(DisplayPath.short(item.path)).font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1).truncationMode(.head)
                 }
             }
             Spacer()

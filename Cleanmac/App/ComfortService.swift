@@ -28,6 +28,13 @@ final class ComfortService {
     var exclusions: () -> [String] = { [] }
     private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
     private(set) var loginMessage: String?
+    /// Analyse programmée en cours (ou lancée à la main depuis les réglages).
+    private(set) var isScanning = false
+    /// Dernière analyse programmée (observée par les réglages).
+    private(set) var lastScheduledDate: Date?
+    private(set) var lastScheduledBytes: Int64 = 0
+    /// Résultat de la dernière analyse lancée à la main.
+    private(set) var scanMessage: String?
     private var loop: Task<Void, Never>?
     private let notificationDelegate = NotificationDelegate()
     private var defaults: UserDefaults { .standard }
@@ -36,6 +43,12 @@ final class ComfortService {
 
     /// Les notifications exigent un vrai paquet d'appli (pas un exécutable isolé).
     private var canNotify: Bool { Bundle.main.bundleIdentifier != nil }
+
+    init() {
+        let value = UserDefaults.standard.double(forKey: ComfortKeys.lastScheduled)
+        lastScheduledDate = value > 0 ? Date(timeIntervalSince1970: value) : nil
+        lastScheduledBytes = Int64(UserDefaults.standard.double(forKey: ComfortKeys.lastScheduledBytes))
+    }
 
     func start() {
         guard loop == nil, canNotify else { return }
@@ -48,13 +61,6 @@ final class ComfortService {
             }
         }
     }
-
-    var lastScheduledDate: Date? {
-        let value = defaults.double(forKey: ComfortKeys.lastScheduled)
-        return value > 0 ? Date(timeIntervalSince1970: value) : nil
-    }
-
-    var lastScheduledBytes: Int64 { Int64(defaults.double(forKey: ComfortKeys.lastScheduledBytes)) }
 
     var nextScheduledDate: Date? {
         guard defaults.bool(forKey: ComfortKeys.scheduled) else { return nil }
@@ -83,12 +89,26 @@ final class ComfortService {
 
     /// Analyse des seules règles « sûres », sans rien supprimer.
     func runScheduledScan() async {
-        guard let rules = rules() else { return }
+        guard !isScanning else { return }
+        guard let rules = rules() else { scanMessage = "Règles non chargées."; return }
+        isScanning = true
+        defer { isScanning = false }
         let safe = rules.rules.filter { $0.risk == .safe && $0.check == nil && $0.source == nil && !$0.inTrash }
         let policy = ProtectionPolicy(userExclusions: exclusions())
-        guard let result = try? await Scanner(policy: policy).scan(rules: safe) else { return }
-        defaults.set(Date().timeIntervalSince1970, forKey: ComfortKeys.lastScheduled)
+        let result: ScanResult
+        do {
+            result = try await Scanner(policy: policy).scan(rules: safe)
+        } catch {
+            scanMessage = "Analyse impossible : \(error.localizedDescription)"
+            return
+        }
+        let now = Date()
+        defaults.set(now.timeIntervalSince1970, forKey: ComfortKeys.lastScheduled)
         defaults.set(Double(result.totalBytes), forKey: ComfortKeys.lastScheduledBytes)
+        lastScheduledDate = now
+        lastScheduledBytes = result.totalBytes
+        scanMessage = "\(Bytes.text(result.totalBytes)) d'éléments sûrs trouvés"
+            + (result.totalBytes > 100_000_000 ? " : notification envoyée." : " : trop peu pour une notification.")
         guard result.totalBytes > 100_000_000 else { return }
         notify(id: "programme", title: "Nettoyage du mois",
                body: "\(Bytes.text(result.totalBytes)) d'éléments sûrs peuvent être nettoyés. Ouvrez Cleanmac pour vérifier avant de nettoyer.")

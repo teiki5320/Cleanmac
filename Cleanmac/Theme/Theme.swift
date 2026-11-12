@@ -56,7 +56,7 @@ enum Theme {
     }
 
     enum Size {
-        static let sidebarWidth: CGFloat = 250
+        static let sidebarWidth: CGFloat = 264
         static let heroSize: CGFloat = 250
         static let scanButton: CGFloat = 104
         static let rowCorner: CGFloat = 12
@@ -75,6 +75,19 @@ enum Theme {
 
     /// Durée des transitions entre modules.
     static var moduleTransition: Animation { .smooth(duration: 0.5) }
+}
+
+/// Couleurs nommées hors modules (jauges), toutes ici.
+enum ThemeColors {
+    /// Jauge du disque : début, fin normale, fin quand le disque est presque plein.
+    static let diskStart = Color(hex: 0x5EEAD4)
+    static let diskEnd = Color(hex: 0x38BDF8)
+    static let diskAlert = Color(hex: 0xF97316)
+    /// Mémoire : applis, système (câblée), compressée, fichiers en cache.
+    static let memoryApps = Color(hex: 0xFDE68A)
+    static let memoryWired = Color(hex: 0xF97316)
+    static let memoryCompressed = Color(hex: 0xA3E635)
+    static let memoryCached = Color.white.opacity(0.3)
 }
 
 /// Couleurs des secteurs de la carte du disque : une par élément du premier anneau,
@@ -150,13 +163,13 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .systeme: "Fichiers système"
         case .developpeur: "Développeur"
         case .mail: "Mail"
-        case .corbeilles: "Corbeilles"
+        case .corbeilles: "Vider les Corbeilles"
         case .icloud: "iCloud Drive"
         case .carte: "Carte du disque"
         case .doublons: "Doublons"
         case .purgeable: "Espace purgeable"
         case .applications: "Applications"
-        case .maintenance: "Maintenance"
+        case .maintenance: "Entretien"
         case .historique: "Historique"
         }
     }
@@ -219,7 +232,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .mail:
             "Pièces jointes téléchargées par Mail et caches de Thunderbird."
         case .corbeilles:
-            "La Corbeille du Mac et celles des disques externes, réunies au même endroit. Vider est définitif : rien n'est coché d'office. Pour Photos, Cleanmac ouvre l'album « Supprimés récemment »."
+            "La Corbeille du Mac et celles des disques externes, réunies au même endroit. Vider est définitif : rien n'est coché d'office. Photos garde ses photos supprimées dans son propre album : Cleanmac ouvre Photos pour que vous le vidiez."
         case .icloud:
             "Libère les fichiers d'iCloud Drive téléchargés sur le Mac, sans les supprimer d'iCloud."
         case .doublons:
@@ -233,7 +246,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .maintenance:
             "Petits soins du système : cache DNS, index Spotlight, services de lancement, mémoire vive. Et les applis qui en consomment le plus."
         case .historique:
-            "Tout ce que Cleanmac a nettoyé, quand, et combien de place a été libérée."
+            "Tout ce que Cleanmac a nettoyé, quand, et combien de place a été libérée ou mise à la Corbeille."
         }
     }
 
@@ -265,7 +278,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
              .init(title: "Toujours dans iCloud", symbol: "checkmark.icloud")]
         case .carte:
             [.init(title: "Vue en anneaux, dossier par dossier", symbol: "chart.pie"),
-             .init(title: "Gros et anciens fichiers", symbol: "doc.badge.clock"),
+             .init(title: "Les plus gros fichiers, avec filtres", symbol: "doc.badge.clock"),
              .init(title: "Lecture seule : rien n'est supprimé", symbol: "lock")]
         case .doublons:
             [.init(title: "Comparaison du contenu, pas du nom", symbol: "number"),

@@ -70,6 +70,16 @@ public struct ScanResult: Sendable {
 
 /// Moteur de scan : lecture seule, asynchrone, annulable, avec progression.
 public struct Scanner: Sendable {
+    /// Nom lisible d'un dossier nommé par un identifiant (pièces jointes de Mail : « UUID/facture.pdf »).
+    static func readableName(_ path: String) -> String? {
+        let name = (path as NSString).lastPathComponent
+        guard UUID(uuidString: name) != nil, PathPattern.isRealDirectory(path) else { return nil }
+        let children = ((try? FileManager.default.contentsOfDirectory(atPath: path)) ?? [])
+            .filter { !$0.hasPrefix(".") }.sorted()
+        guard let first = children.first else { return nil }
+        return children.count == 1 ? first : "\(first) et \(children.count - 1) autre\(children.count > 2 ? "s" : "")"
+    }
+
     public let policy: ProtectionPolicy
     public let pattern: PathPattern
     public let sources: [RuleSource: any ExternalSource]
@@ -136,6 +146,8 @@ public struct Scanner: Sendable {
             for path in pattern.expand(rule: rule) {
                 try Task.checkCancellation()
                 if claimed.contains(where: { ProtectionPolicy.isSameOrInside(path, $0) }) { continue }
+                // Corbeilles : seulement ce qui est directement dans une vraie Corbeille (aucun lien suivi).
+                if rule.inTrash, !TrashLocation.isDirectlyInTrash(path, home: policy.home, uid: pattern.uid) { continue }
 
                 if let reason = policy.protection(for: path) {
                     skipped.append(SkippedItem(path: path, ruleID: rule.id, reason: reason))
@@ -158,12 +170,14 @@ public struct Scanner: Sendable {
                     continue
                 }
                 claimed.append(path)
-                items.append(ScanItem(
+                var item = ScanItem(
                     path: path,
                     ruleID: rule.id,
                     allocatedBytes: measure.allocatedBytes,
                     fileCount: measure.fileCount,
-                    isSelectedByDefault: rule.isSelectedByDefault))
+                    isSelectedByDefault: rule.isSelectedByDefault)
+                item.displayName = Self.readableName(path)
+                items.append(item)
                 state.itemsFound = items.count
                 state.bytesFound += measure.allocatedBytes
                 progress?(state)

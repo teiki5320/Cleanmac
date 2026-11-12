@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "mail.pieces-jointes",
+      "name": "Pièces jointes ouvertes depuis Mail",
+      "category": "mail",
+      "risk": "review",
+      "explanation": "Copies des pièces jointes que vous avez ouvertes depuis Mail. Les originaux restent dans vos messages : Mail les retélécharge si vous les rouvrez. À vérifier si vous avez modifié une pièce jointe sans l'enregistrer ailleurs.",
+      "paths": [
+        "~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/*",
+        "~/Library/Mail Downloads/*"
+      ]
+    },
+    {
+      "id": "mail.thunderbird-caches",
+      "name": "Caches de Thunderbird",
+      "category": "mail",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Cache de Thunderbird (pages, images et code déjà chargés). Thunderbird le recrée tout seul ; vos messages et votre profil ne sont pas touchés.",
+      "paths": ["~/Library/Caches/Thunderbird"]
+    }
+  ]
+}

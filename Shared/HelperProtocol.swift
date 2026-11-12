@@ -9,7 +9,7 @@ enum HelperConstants {
     static let appIdentifier = "com.teiki.cleanmac"
     static let teamIdentifier = "K597U7X3FZ"
     /// Incrémenter à chaque changement du protocole ou des commandes.
-    static let helperVersion = "1"
+    static let helperVersion = "2"
 
     /// Exigence de signature imposée à l'appli qui se connecte à l'outil d'aide.
     static let clientRequirement =
@@ -28,15 +28,13 @@ enum HelperCommand: String, CaseIterable, Sendable {
     case reindexSpotlight
     case purgeMemory
     case thinLocalSnapshots
-    case runMaintenanceScripts
 
     var label: String {
         switch self {
         case .flushDNSCache: "Vider le cache DNS"
         case .reindexSpotlight: "Réindexer Spotlight"
         case .purgeMemory: "Libérer la mémoire vive"
-        case .thinLocalSnapshots: "Purger les instantanés APFS locaux"
-        case .runMaintenanceScripts: "Lancer les scripts de maintenance"
+        case .thinLocalSnapshots: "Purger les instantanés Time Machine locaux"
         }
     }
 
@@ -52,8 +50,6 @@ enum HelperCommand: String, CaseIterable, Sendable {
             [("/usr/sbin/purge", [])]
         case .thinLocalSnapshots:
             [("/usr/bin/tmutil", ["thinlocalsnapshots", "/", "999999999999", "4"])]
-        case .runMaintenanceScripts:
-            [("/usr/sbin/periodic", ["daily", "weekly", "monthly"])]
         }
     }
 }

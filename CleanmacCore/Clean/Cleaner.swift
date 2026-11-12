@@ -32,12 +32,15 @@ public struct CleanRequest: Sendable, Hashable {
     /// Exemplaire gardé, pour les règles `duplicateCopy` : la copie n'est supprimée que s'il
     /// existe et a exactement le même contenu.
     public let keeperPath: String?
+    /// Appli concernée, pour les règles à jetons (`appFiles`, `appLeftover`).
+    public let app: AppIdentity?
 
-    public init(path: String, ruleID: String, bytes: Int64, keeperPath: String? = nil) {
+    public init(path: String, ruleID: String, bytes: Int64, keeperPath: String? = nil, app: AppIdentity? = nil) {
         self.path = path
         self.ruleID = ruleID
         self.bytes = bytes
         self.keeperPath = keeperPath
+        self.app = app
     }
 
     public init(_ item: ScanItem) {
@@ -60,6 +63,11 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
     case notRegularFile
     case notDownloaded
     case contentDiffers
+    case notInTrash
+    case appRequired
+    case appRunning(String)
+    case appStillInstalled
+    case ownApp
 
     public var description: String {
         switch self {
@@ -77,6 +85,11 @@ public enum CleanRefusal: Error, Equatable, CustomStringConvertible {
         case .notRegularFile: "Ce n'est pas un fichier ordinaire"
         case .notDownloaded: "Fichier iCloud non téléchargé : non vérifiable"
         case .contentDiffers: "Le contenu n'est plus identique à l'exemplaire gardé : copie conservée"
+        case .notInTrash: "N'est pas directement dans une Corbeille"
+        case .appRequired: "Appli non indiquée ou invalide"
+        case let .appRunning(name): "\(name) est ouverte : quittez-la d'abord"
+        case .appStillInstalled: "Une appli portant cet identifiant est installée : ce n'est pas un reste"
+        case .ownApp: "Cleanmac ne se désinstalle pas lui-même"
         }
     }
 }
@@ -89,6 +102,7 @@ public struct Cleaner: Sendable {
     public let remover: any FileRemoving
     public let journal: CleanJournal
     public let sources: [RuleSource: any ExternalSource]
+    public let apps: any AppChecking
     /// Suppression définitive autorisée par l'utilisateur (caches régénérables uniquement).
     public let allowPermanentDeletion: Bool
 
@@ -98,6 +112,7 @@ public struct Cleaner: Sendable {
         remover: any FileRemoving = SystemFileRemover(),
         journal: CleanJournal = CleanJournal(),
         sources: [RuleSource: any ExternalSource] = ExternalSources.system,
+        apps: any AppChecking = SystemAppChecker(),
         allowPermanentDeletion: Bool = false
     ) {
         self.rules = rules
@@ -105,11 +120,14 @@ public struct Cleaner: Sendable {
         self.remover = remover
         self.journal = journal
         self.sources = sources
+        self.apps = apps
         self.allowPermanentDeletion = allowPermanentDeletion
     }
 
     /// Méthode de suppression appliquée à une règle.
     public func method(for rule: Rule) -> RemovalMethod {
+        // Vider une Corbeille est forcément définitif (les éléments y sont déjà).
+        if rule.inTrash { return .permanent }
         if rule.check != nil { return .trash }
         if rule.source != nil { return .permanent }
         return allowPermanentDeletion && rule.regenerable ? .permanent : .trash
@@ -127,19 +145,44 @@ public struct Cleaner: Sendable {
         }
         guard rule.source == nil else { throw .notMatchingRule(ruleID: rule.id) }
         let pattern = PathPattern(home: policy.home)
-        guard pattern.matches(request.path, rule: rule) else {
-            throw .notMatchingRule(ruleID: rule.id)
+        if rule.isAppTemplate {
+            guard let app = request.app, app.problem == nil else { throw .appRequired }
+            guard pattern.matches(request.path, rule: rule, app: app) else {
+                throw .notMatchingRule(ruleID: rule.id)
+            }
+        } else {
+            guard pattern.matches(request.path, rule: rule) else {
+                throw .notMatchingRule(ruleID: rule.id)
+            }
+        }
+        if rule.inTrash, !TrashLocation.isDirectlyInTrash(request.path, home: policy.home, uid: pattern.uid) {
+            throw .notInTrash
         }
         if let reason = policy.fullProtection(for: request.path) {
             throw .protected(reason)
         }
         guard PathPattern.exists(request.path) else { throw .missing }
+        if let app = request.app {
+            switch rule.check {
+            case .appFiles?:
+                if app.bundleID == Self.ownBundleID { throw .ownApp }
+                if apps.isRunning(bundleID: app.bundleID) { throw .appRunning(app.name) }
+            case .appLeftover?:
+                if app.bundleID.hasPrefix("com.apple.") || app.bundleID == Self.ownBundleID { throw .appStillInstalled }
+                if apps.isInstalled(bundleID: app.bundleID) { throw .appStillInstalled }
+            default:
+                break
+            }
+        }
         if rule.check == .duplicateCopy {
             guard let keeper = request.keeperPath, keeper != request.path else { throw .keeperRequired }
             guard PathPattern.exists(keeper) else { throw .keeperMissing }
         }
         return rule
     }
+
+    /// Identifiant de Cleanmac, jamais désinstallé par lui-même.
+    public static let ownBundleID = "com.teiki.cleanmac"
 
     /// Contrôle d'une copie (règle `duplicateCopy`), fait juste avant la suppression :
     /// deux fichiers ordinaires distincts, présents sur ce Mac, de même taille et au contenu
@@ -206,6 +249,7 @@ public struct Cleaner: Sendable {
                 switch method {
                 case .trash: trashedPath = try remover.trash(request.path)
                 case .permanent: try remover.removePermanently(request.path)
+                case .evicted: throw CleanRefusal.notMatchingRule(ruleID: rule.id)   // jamais par le nettoyeur
                 }
                 lines.append(JournalItem(
                     path: request.path, ruleID: request.ruleID, bytes: request.bytes,

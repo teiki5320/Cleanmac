@@ -71,6 +71,16 @@
       "paths": []
     },
     {
+      "id": "dev.simulateurs-indisponibles",
+      "name": "Simulateurs indisponibles",
+      "category": "developer",
+      "risk": "safe",
+      "regenerable": true,
+      "source": "unavailableSimulators",
+      "explanation": "Simulateurs dont le système n'est plus installé : ils ne peuvent plus démarrer. Supprimés par Xcode (xcrun simctl delete), donc définitivement : il faut activer la suppression définitive dans les réglages.",
+      "paths": []
+    },
+    {
       "id": "dev.gradle-caches",
       "name": "Gradle : caches",
       "category": "developer",

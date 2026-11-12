@@ -41,7 +41,7 @@ public enum ExternalReference {
 /// Les sources réelles du système.
 public enum ExternalSources {
     public static var system: [RuleSource: any ExternalSource] {
-        [.simulatorRuntimes: SimulatorRuntimeSource()]
+        [.simulatorRuntimes: SimulatorRuntimeSource(), .unavailableSimulators: UnavailableSimulatorSource()]
     }
 }
 
@@ -57,12 +57,15 @@ public enum ExternalSourceError: Error, LocalizedError {
 
 /// Exécute un outil en ligne de commande (chemin absolu, arguments fixes, sans shell).
 enum ToolRunner {
-    static func run(_ executable: String, _ arguments: [String]) async throws -> Data {
+    static func run(_ executable: String, _ arguments: [String], environment: [String: String] = [:]) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: executable)
                 process.arguments = arguments
+                if !environment.isEmpty {
+                    process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+                }
                 let output = Pipe()
                 let errors = Pipe()
                 process.standardOutput = output
@@ -73,8 +76,17 @@ enum ToolRunner {
                     continuation.resume(throwing: error)
                     return
                 }
+                // Les deux sorties sont lues en même temps : un outil bavard sur l'une ne bloque pas l'autre.
+                let errorBox = DataBox()
+                let reading = DispatchGroup()
+                reading.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    errorBox.data = errors.fileHandleForReading.readDataToEndOfFile()
+                    reading.leave()
+                }
                 let data = output.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+                reading.wait()
+                let errorData = errorBox.data
                 process.waitUntilExit()
                 if process.terminationStatus == 0 {
                     continuation.resume(returning: data)
@@ -87,4 +99,9 @@ enum ToolRunner {
             }
         }
     }
+}
+
+/// Tampon partagé entre deux files de lecture (écrit une fois, lu après `wait`).
+private final class DataBox: @unchecked Sendable {
+    var data = Data()
 }

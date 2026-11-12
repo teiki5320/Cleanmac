@@ -5,9 +5,12 @@ import Foundation
 public struct PathPattern: Sendable {
     /// Dossier personnel utilisé pour `~` (injectable pour les tests).
     public let home: String
+    /// Identifiant numérique de l'utilisateur, pour le jeton `{uid}`.
+    public let uid: UInt32
 
-    public init(home: String = NSHomeDirectory()) {
+    public init(home: String = NSHomeDirectory(), uid: UInt32 = getuid()) {
         self.home = Self.trimmed(home)
+        self.uid = uid
     }
 
     /// Retire les « / » finaux sans jamais réécrire le chemin
@@ -46,10 +49,27 @@ public struct PathPattern: Sendable {
 
     /// Chemin absolu du motif (`~` remplacé par le dossier personnel).
     public func absolute(_ pattern: String) -> String {
+        let pattern = pattern.replacingOccurrences(of: "{uid}", with: String(uid))
         if pattern.hasPrefix("~/") {
             return home + "/" + pattern.dropFirst(2)
         }
         return pattern
+    }
+
+    /// Motif où les jetons d'appli sont remplacés par une identité validée
+    /// (`nil` si l'identité est refusée).
+    public static func substituting(_ pattern: String, app: AppIdentity) -> String? {
+        guard app.problem == nil else { return nil }
+        return pattern
+            .replacingOccurrences(of: "{bundleID}", with: app.bundleID)
+            .replacingOccurrences(of: "{appName}", with: app.name)
+    }
+
+    /// Motifs d'une règle à jetons, pour une appli donnée.
+    public func patterns(of rule: Rule, app: AppIdentity) -> (paths: [String], excludes: [String])? {
+        guard app.problem == nil else { return nil }
+        return (rule.paths.compactMap { Self.substituting($0, app: app) },
+                rule.excludes.compactMap { Self.substituting($0, app: app) })
     }
 
     /// Le chemin correspond-il au motif ? (`*` ne traverse pas les « / »)
@@ -60,7 +80,12 @@ public struct PathPattern: Sendable {
     /// Le chemin correspond-il à l'un des chemins de la règle, hors exclusions ?
     /// Pour une règle à contrôle, les chemins sont des dossiers : le chemin doit être strictement
     /// à l'intérieur (jamais le dossier lui-même).
-    public func matches(_ path: String, rule: Rule) -> Bool {
+    public func matches(_ path: String, rule: Rule, app: AppIdentity? = nil) -> Bool {
+        if rule.isAppTemplate {
+            guard let app, let patterns = patterns(of: rule, app: app) else { return false }
+            return patterns.paths.contains { matches(path, pattern: $0) }
+                && !patterns.excludes.contains { matches(path, pattern: $0) }
+        }
         if rule.check != nil {
             func inside(_ folder: String) -> Bool {
                 let base = Self.trimmed(absolute(folder))
@@ -74,10 +99,16 @@ public struct PathPattern: Sendable {
 
     /// Liste les éléments existants qui correspondent aux chemins de la règle.
     /// Les liens symboliques ne sont jamais suivis par les jokers.
-    public func expand(rule: Rule) -> [String] {
+    public func expand(rule: Rule, app: AppIdentity? = nil) -> [String] {
+        var paths = rule.paths
+        var excludes = rule.excludes
+        if rule.isAppTemplate {
+            guard let app, let patterns = patterns(of: rule, app: app) else { return [] }
+            (paths, excludes) = patterns
+        }
         var result = Set<String>()
-        for pattern in rule.paths {
-            for path in expand(pattern) where !rule.excludes.contains(where: { matches(path, pattern: $0) }) {
+        for pattern in paths {
+            for path in expand(pattern) where !excludes.contains(where: { matches(path, pattern: $0) }) {
                 result.insert(path)
             }
         }

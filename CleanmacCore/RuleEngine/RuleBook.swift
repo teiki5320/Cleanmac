@@ -106,13 +106,51 @@ public struct RuleBook: Sendable {
                 if let reason = PathPattern.problem(with: path) {
                     throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: reason)
                 }
-                if rule.check != nil, path.split(separator: "/").contains(where: { PathPattern.hasGlob(String($0)) }) {
-                    throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "joker interdit dans une règle à contrôle")
+                let hasToken = path.contains("{bundleID}") || path.contains("{appName}")
+                if hasToken && !rule.isAppTemplate {
+                    throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "jeton d'appli réservé aux règles d'applis")
+                }
+                let hasGlob = path.split(separator: "/").contains(where: { PathPattern.hasGlob(String($0)) })
+                switch rule.check {
+                case .duplicateCopy?:
+                    if hasGlob {
+                        throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "joker interdit dans une règle à contrôle")
+                    }
+                case .appLeftover?:
+                    if hasGlob || path.contains("{appName}") {
+                        throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "les restes ne se repèrent que par l'identifiant, sans joker")
+                    }
+                    fallthrough
+                case .appFiles?:
+                    // Chaque chemin (hors exclusions) doit dépendre de l'appli.
+                    if rule.paths.contains(path) && !hasToken {
+                        throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "chemin sans jeton d'appli")
+                    }
+                    // « {bundleID}* » couvrirait d'autres applis (com.foo.app → com.foo.application).
+                    for glob in ["*", "?", "["] where path.contains("}" + glob) || path.contains(glob + "{") {
+                        throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "joker collé au jeton")
+                    }
+                case nil:
+                    break
                 }
             }
-            if rule.check != nil {
-                guard rule.risk == .review, !rule.regenerable else {
-                    throw RuleError.invalidCheck(ruleID: rule.id, reason: "une règle à contrôle est « à vérifier » et non régénérable")
+            if let check = rule.check {
+                guard !rule.regenerable, !rule.inTrash else {
+                    throw RuleError.invalidCheck(ruleID: rule.id, reason: "une règle à contrôle va uniquement à la Corbeille")
+                }
+                if check != .appFiles && rule.risk != .review {
+                    throw RuleError.invalidCheck(ruleID: rule.id, reason: "une règle à contrôle est « à vérifier »")
+                }
+            }
+            if rule.inTrash {
+                for path in rule.paths {
+                    guard path.hasSuffix("/*") else {
+                        throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "une règle de Corbeille vise le contenu d'une Corbeille (« …/* »)")
+                    }
+                    let folder = String(path.dropLast(2))
+                    guard folder == "~/.Trash" || folder.hasSuffix("/.Trashes/{uid}") else {
+                        throw RuleError.invalidPath(ruleID: rule.id, path: path, reason: "dossier qui n'est pas une Corbeille")
+                    }
                 }
             }
         }

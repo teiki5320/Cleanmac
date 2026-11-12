@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "corbeilles.mac",
+      "name": "Corbeille du Mac",
+      "category": "trash",
+      "risk": "review",
+      "inTrash": true,
+      "explanation": "Éléments que vous avez déjà mis à la Corbeille. Vider la Corbeille les supprime définitivement : ils ne seront plus récupérables. Rien n'est coché d'office.",
+      "paths": ["~/.Trash/*"],
+      "excludes": ["~/.Trash/.DS_Store"]
+    },
+    {
+      "id": "corbeilles.disques-externes",
+      "name": "Corbeilles des disques externes",
+      "category": "trash",
+      "risk": "review",
+      "inTrash": true,
+      "explanation": "Éléments mis à la Corbeille depuis un disque externe ou une clé USB : ils restent sur ce disque tant que sa Corbeille n'est pas vidée. Les supprimer est définitif.",
+      "paths": ["/Volumes/*/.Trashes/{uid}/*"],
+      "excludes": ["/Volumes/*/.Trashes/{uid}/.DS_Store"]
+    }
+  ]
+}

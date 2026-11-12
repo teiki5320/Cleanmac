@@ -4,11 +4,14 @@ import Foundation
 public enum RemovalMethod: String, Codable, Sendable {
     case trash
     case permanent
+    /// Fichier iCloud libéré du Mac : il reste dans iCloud et se retélécharge à l'ouverture.
+    case evicted
 
     public var label: String {
         switch self {
         case .trash: "Mis à la Corbeille"
         case .permanent: "Supprimé définitivement"
+        case .evicted: "Libéré du Mac, toujours dans iCloud"
         }
     }
 }
@@ -23,6 +26,17 @@ public struct JournalItem: Codable, Sendable, Equatable {
     public let message: String?
     /// Emplacement dans la Corbeille, si l'élément y a été mis.
     public let trashedPath: String?
+
+    public init(path: String, ruleID: String, bytes: Int64, method: RemovalMethod,
+                succeeded: Bool, message: String?, trashedPath: String?) {
+        self.path = path
+        self.ruleID = ruleID
+        self.bytes = bytes
+        self.method = method
+        self.succeeded = succeeded
+        self.message = message
+        self.trashedPath = trashedPath
+    }
 }
 
 /// Un nettoyage complet.
@@ -30,6 +44,12 @@ public struct JournalEntry: Codable, Sendable, Identifiable, Equatable {
     public let id: UUID
     public let date: Date
     public let items: [JournalItem]
+
+    public init(id: UUID = UUID(), date: Date = Date(), items: [JournalItem]) {
+        self.id = id
+        self.date = date
+        self.items = items
+    }
 
     public var freedBytes: Int64 {
         items.filter(\.succeeded).reduce(0) { $0 + $1.bytes }

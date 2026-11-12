@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "applications.appli",
+      "name": "Appli et réglages",
+      "category": "apps",
+      "risk": "safe",
+      "check": "appFiles",
+      "explanation": "L'appli que vous avez choisi de désinstaller, avec ses préférences, caches, journaux et états enregistrés. Tout va à la Corbeille : l'appli reste récupérable tant que la Corbeille n'est pas vidée.",
+      "paths": [
+        "/Applications/{appName}.app",
+        "~/Applications/{appName}.app",
+        "~/Library/Preferences/{bundleID}.plist",
+        "~/Library/Preferences/ByHost/{bundleID}.*.plist",
+        "~/Library/Caches/{bundleID}",
+        "~/Library/Caches/{appName}",
+        "~/Library/HTTPStorages/{bundleID}",
+        "~/Library/HTTPStorages/{bundleID}.binarycookies",
+        "~/Library/WebKit/{bundleID}",
+        "~/Library/Cookies/{bundleID}.binarycookies",
+        "~/Library/Saved Application State/{bundleID}.savedState",
+        "~/Library/Logs/{appName}",
+        "~/Library/Logs/{bundleID}",
+        "~/Library/Application Scripts/{bundleID}"
+      ]
+    },
+    {
+      "id": "applications.donnees",
+      "name": "Données de l'appli",
+      "category": "apps",
+      "risk": "review",
+      "check": "appFiles",
+      "explanation": "Dossiers où l'appli range vos données (bases, projets, réglages avancés). À vérifier : ils peuvent contenir des documents créés avec l'appli. Rien n'est coché d'office.",
+      "paths": [
+        "~/Library/Application Support/{bundleID}",
+        "~/Library/Application Support/{appName}",
+        "~/Library/Containers/{bundleID}",
+        "~/Library/Group Containers/*.{bundleID}",
+        "~/Library/LaunchAgents/{bundleID}.plist"
+      ]
+    },
+    {
+      "id": "applications.restes",
+      "name": "Restes d'applis supprimées",
+      "category": "apps",
+      "risk": "review",
+      "check": "appLeftover",
+      "explanation": "Fichiers laissés par une appli qui n'est plus installée, repérés par son identifiant. Juste avant la Corbeille, Cleanmac revérifie qu'aucune appli installée ne porte cet identifiant. Rien n'est coché d'office.",
+      "paths": [
+        "~/Library/Application Support/{bundleID}",
+        "~/Library/Caches/{bundleID}",
+        "~/Library/Preferences/{bundleID}.plist",
+        "~/Library/Containers/{bundleID}",
+        "~/Library/Saved Application State/{bundleID}.savedState",
+        "~/Library/HTTPStorages/{bundleID}",
+        "~/Library/WebKit/{bundleID}",
+        "~/Library/Cookies/{bundleID}.binarycookies",
+        "~/Library/Logs/{bundleID}",
+        "~/Library/Application Scripts/{bundleID}"
+      ]
+    }
+  ]
+}

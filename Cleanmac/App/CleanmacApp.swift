@@ -3,15 +3,30 @@ import SwiftUI
 @main
 struct CleanmacApp: App {
     @State private var model = AppModel()
+    @AppStorage(ComfortKeys.menuBar) private var showMenuBar = true
 
     var body: some Scene {
-        WindowGroup("Cleanmac") {
+        WindowGroup("Cleanmac", id: "main") {
             RootView()
                 .environment(model)
                 .frame(minWidth: 960, minHeight: 680)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 820)
+
+        Settings {
+            SettingsView()
+                .environment(model)
+        }
+
+        MenuBarExtra(isInserted: $showMenuBar) {
+            MenuBarView()
+                .environment(model)
+        } label: {
+            Image(systemName: "sparkles")
+                .accessibilityLabel("Cleanmac")
+        }
+        .menuBarExtraStyle(.window)
     }
 }
 

@@ -15,12 +15,7 @@ final class DuplicatesModel {
         case failed(String)
     }
 
-    enum CleanState {
-        case idle
-        case cleaning(done: Int, total: Int)
-        case finished(JournalEntry)
-        case failed(String)
-    }
+    typealias CleanState = CleanPhase
 
     /// Règle qui autorise la mise à la Corbeille des copies.
     static let ruleID = "doublons.copies"

@@ -14,12 +14,7 @@ final class AppModel {
         case failed(String)
     }
 
-    enum CleanState {
-        case idle
-        case cleaning(done: Int, total: Int)
-        case finished(JournalEntry)
-        case failed(String)
-    }
+    typealias CleanState = CleanPhase
 
     var fullDiskAccess: FullDiskAccess.Status = .unknown
     var rules: RuleBook?
@@ -34,6 +29,14 @@ final class AppModel {
     let diskMap = DiskMapModel()
     /// Recherche des doublons et mise à la Corbeille des copies.
     let duplicates = DuplicatesModel()
+    /// Fichiers d'iCloud Drive à libérer du Mac.
+    let icloud = ICloudModel()
+    /// Désinstallation, restes, démarrage, mises à jour.
+    let apps = AppsModel()
+    let purgeable: PurgeableModel
+    let maintenance: MaintenanceModel
+    /// Alerte d'espace et analyse programmée.
+    let comfort = ComfortService()
 
     /// Réglage : suppression définitive des caches régénérables (désactivée par défaut).
     var allowPermanentDeletion: Bool {
@@ -44,9 +47,12 @@ final class AppModel {
     private var scanTask: Task<Void, Never>?
     private let journal = CleanJournal()
     /// Exclusions de l'utilisateur, relues à chaque scan.
-    private var exclusions: [String] = ExclusionStore().load()
+    private(set) var exclusions: [String] = ExclusionStore().load()
 
     init() {
+        ComfortKeys.registerDefaults()
+        purgeable = PurgeableModel(helper: helper)
+        maintenance = MaintenanceModel(helper: helper)
         allowPermanentDeletion = UserDefaults.standard.bool(forKey: Self.permanentKey)
         refreshFullDiskAccess()
         loadRules()
@@ -57,7 +63,33 @@ final class AppModel {
             return self.makeCleaner()
         }
         duplicates.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
+        icloud.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
+        apps.makeCleaner = { [unowned self] in
+            self.exclusions = ExclusionStore().load()
+            return self.makeCleaner()
+        }
+        apps.makePolicy = { [unowned self] in ProtectionPolicy(userExclusions: self.exclusions) }
+        apps.rules = { [unowned self] in self.rules?.rules(in: .apps) ?? [] }
+        apps.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
+        comfort.rules = { [unowned self] in self.rules }
+        comfort.exclusions = { ExclusionStore().load() }
+        comfort.start()
     }
+
+    // MARK: Exclusions
+
+    func addExclusion(_ path: String) {
+        try? ExclusionStore().add(path)
+        exclusions = ExclusionStore().load()
+    }
+
+    func removeExclusion(_ path: String) {
+        try? ExclusionStore().remove(path)
+        exclusions = ExclusionStore().load()
+    }
+
+    /// Total libéré depuis le début (éléments réussis du journal).
+    var totalFreed: Int64 { journalEntries.reduce(0) { $0 + $1.freedBytes } }
 
     func refreshFullDiskAccess() {
         fullDiskAccess = FullDiskAccess.status()

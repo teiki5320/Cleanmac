@@ -6,9 +6,9 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 ## Phase 0 — Fondations
 - [x] Projet Xcode : appli SwiftUI macOS 15+, cibles `Cleanmac`, `CleanmacCore`, `CleanmacHelper`, tests
 - [x] `.gitignore` Xcode, signature locale (équipe perso)
-- [ ] Écran d'accueil au premier lancement : explication + bouton qui ouvre
+- [x] Écran d'accueil au premier lancement : explication + bouton qui ouvre
       Réglages système › Confidentialité › Accès complet au disque, et détection de l'autorisation
-      → codé et compilé, détection testée ; reste à le valider à l'écran
+      → codé, détection testée ; refait en style verre (0.7.0), rendu hors écran vérifié
 - [ ] Installation de l'outil d'aide privilégié (`SMAppService`) + XPC avec commandes autorisées
       → codé, paquet et signatures vérifiés ; reste à l'installer, l'autoriser dans
         Réglages système › Général › Ouverture et extensions, puis « Tester la connexion »
@@ -25,30 +25,33 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 ## Phase 1 — Design
 - [x] Maquette validée par l'utilisateur : style « verre » (maquette n°10 de la toile
       « Cleanmac — pistes de design »), pour tous les modules
-- [ ] Fichier de thème : couleurs, dégradés par module, typographie, espacements
-      → codé (`Cleanmac/Theme/Theme.swift`, 0.3.0) ; reste à compiler et valider à l'écran
-- [ ] Fenêtre principale : barre latérale translucide + zone de contenu
-      → codé (`Cleanmac/Views/Glass/MainWindowView.swift`) ; reste à valider à l'écran
-- [ ] Composants : gros bouton de scan animé, anneau de progression, cartes de résultat,
+- [x] Fichier de thème : couleurs, dégradés par module, typographie, espacements
+      → `Cleanmac/Theme/Theme.swift` (0.3.0), étendu aux 15 modules (0.7.0)
+- [x] Fenêtre principale : barre latérale translucide + zone de contenu
+      → `MainWindowView.swift` ; trois sections (Nettoyage, Espace et applis, Entretien), défilante (0.7.0)
+- [x] Composants : gros bouton de scan animé, anneau de progression, cartes de résultat,
       liste détaillée avec cases à cocher, écran « terminé » avec espace libéré
-      → bouton rond, anneau, objets en verre animés et fond animé codés ; les résultats
-        reprennent la liste à cases à cocher dans un panneau en verre. Restent : écran de
-        vérification et écran « terminé » au style verre (aujourd'hui une feuille simple)
+      → 0.7.0 : écran de vérification et écran « terminé » (coche animée, espace traité) au style verre,
+        communs à tous les modules (`GlassScreens.swift`) ; cases à cocher de 44 pt partout
 
 ## Phase 2 — Modules de nettoyage
-- [ ] **Analyse complète** : parcourt toutes les règles, résume, nettoie après validation
-- [ ] **Fichiers système inutiles** : caches utilisateur, logs, fichiers temporaires,
-      caches d'applis connues, rapports de plantage
+- [x] **Analyse complète** : parcourt toutes les règles, résume, nettoie après validation
+      → 0.3.1, et inclut Mail et Corbeilles depuis 0.7.0
+- [x] **Fichiers système inutiles** : caches utilisateur, logs, fichiers temporaires,
+      caches d'applis connues, rapports de plantage (`Rules/systeme.json`)
 - [x] **Développeur** : Xcode (DerivedData, Archives, iOS DeviceSupport, simulateurs via `xcrun simctl`),
       Gradle, `.pub-cache` / Flutter, npm / pnpm / yarn, Homebrew (`brew cleanup`), CocoaPods, pip ;
       modèles Ollama et ComfyUI affichés mais jamais cochés par défaut
       → fait en avance (0.2.0), avec en plus : copies des appareils (CoreDevice), SDK Android,
         caches et machine virtuelle de Claude. Homebrew : cache des téléchargements au lieu de `brew cleanup`.
-        Reste : simulateurs « indisponibles » (`xcrun simctl delete unavailable`, aucun sur ce Mac).
-- [ ] **Mail** : pièces jointes téléchargées de Mail et caches de Thunderbird
-- [ ] **Corbeilles** : Corbeille système, corbeilles des volumes externes, corbeille de Photos
-- [ ] **iCloud Drive** : repérer les fichiers téléchargés en local et les libérer (`brctl evict`)
+        0.7.0 : simulateurs « indisponibles » (source `unavailableSimulators`, `xcrun simctl delete <udid>`).
+- [x] **Mail** : pièces jointes téléchargées de Mail et caches de Thunderbird
+      → 0.7.0 : `Rules/mail.json` ; pièces jointes « à vérifier », cache Thunderbird « sûr »
+- [x] **Corbeilles** : Corbeille système, corbeilles des volumes externes, corbeille de Photos
+      → 0.7.0 : `Rules/corbeilles.json` (règles `inTrash`) ; Photos : bouton qui ouvre Photos (photothèque protégée)
+- [x] **iCloud Drive** : repérer les fichiers téléchargés en local et les libérer (`brctl evict`)
       sans les supprimer d'iCloud
+      → 0.7.0 : `ICloudScanner` + `ICloudEvictionService` (`evictUbiquitousItem`, `brctl evict` en secours)
 
 ## Phase 3 — Espace disque
 - [x] **Carte du disque** : vue en anneaux ou en blocs, navigation par dossier, taille en direct
@@ -63,24 +66,30 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
         à garder, copies APFS repérées, aperçu et Finder.
       → 0.6.0 : choix de l'exemplaire gardé, copies à cocher, écran de vérification, mise à la Corbeille
         via la règle `doublons.copies` avec revérification octet par octet. Reste à valider à l'écran.
-- [ ] **Instantanés APFS locaux** et espace « purgeable » : affichage et purge (via l'outil d'aide)
+- [x] **Instantanés APFS locaux** et espace « purgeable » : affichage et purge (via l'outil d'aide)
+      → 0.7.0 : module « Espace purgeable » ; la purge exige l'outil d'aide installé et autorisé
 
 ## Phase 4 — Applications
-- [ ] **Désinstallateur** : appli + tous ses fichiers associés (`~/Library`, conteneurs, préférences)
-- [ ] **Restes** d'applis déjà supprimées
-- [ ] **Démarrage** : éléments de connexion et agents `launchd`, activer / désactiver
-- [ ] **Mises à jour** : liste des applis qui ont une nouvelle version (Sparkle, Homebrew Cask)
+- [x] **Désinstallateur** : appli + tous ses fichiers associés (`~/Library`, conteneurs, préférences)
+      → 0.7.0 : règles à jetons `applications.appli` (sûr) et `applications.donnees` (à vérifier)
+- [x] **Restes** d'applis déjà supprimées → 0.7.0 : règle `applications.restes`
+- [x] **Démarrage** : éléments de connexion et agents `launchd`, activer / désactiver
+      → 0.7.0 : vos agents (`launchctl enable/disable`) ; ceux du système en lecture seule
+- [x] **Mises à jour** : liste des applis qui ont une nouvelle version (Sparkle, Homebrew Cask)
+      → 0.7.0 : lecture seule (flux Sparkle, `brew outdated --cask --greedy`)
 
 ## Phase 5 — Maintenance
-- [ ] Vider le cache DNS, réindexer Spotlight, reconstruire les services de lancement,
+- [x] Vider le cache DNS, réindexer Spotlight, reconstruire les services de lancement,
       lancer les scripts de maintenance (via l'outil d'aide)
-- [ ] Libérer la mémoire vive (purge) et afficher les applis gourmandes
+      → 0.7.0 : module « Maintenance ». Les scripts `periodic` n'existent plus sur ce macOS : retirés.
+- [x] Libérer la mémoire vive (purge) et afficher les applis gourmandes
 
 ## Phase 6 — Confort
-- [ ] **Barre des menus** : espace libre, mémoire, alerte quand le disque passe sous un seuil
-- [ ] **Nettoyage programmé** : chaque mois, analyse sûre + notification avant de nettoyer
-- [ ] **Historique** : journal des nettoyages et total libéré
-- [ ] **Réglages** : exclusions, Corbeille ou suppression définitive, seuils, langue
+- [x] **Barre des menus** : espace libre, mémoire, alerte quand le disque passe sous un seuil
+- [x] **Nettoyage programmé** : chaque mois, analyse sûre + notification avant de nettoyer
+- [x] **Historique** : journal des nettoyages et total libéré
+- [x] **Réglages** : exclusions, Corbeille ou suppression définitive, seuils, langue
+      → fenêtre Réglages (⌘,) ; langue : français uniquement (règle du projet), pas de choix
 
 ## Décisions
 - Usage perso, pas de Mac App Store, pas d'anti-malware.
@@ -163,3 +172,24 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   par octet. Protections inchangées : Bureau, Documents, Images, dossiers git restent intouchables
   (ces copies se suppriment depuis le Finder).
 - Version 0.6.0 (build 7).
+- Version 0.7.0 (build 8) : tous les modules du plan.
+- Corbeilles : vider une Corbeille est forcément définitif. Règles `inTrash` (`~/.Trash/*`,
+  `/Volumes/*/.Trashes/{uid}/*`) : méthode « définitive » sans dépendre du réglage (exception assumée à
+  la règle n°1, puisque les éléments sont déjà dans la Corbeille), toujours « à vérifier » (rien coché
+  d'office), écran de vérification avec avertissement. Le nettoyeur revérifie que l'élément est
+  directement dans une vraie Corbeille (aucun lien symbolique). Corbeille de Photos : la photothèque
+  reste protégée, Cleanmac ouvre seulement Photos.
+- Applications : règles à jetons (`{bundleID}`, `{appName}`), contrôles `appFiles` et `appLeftover`.
+  L'identité de l'appli est validée (pas de joker, de « / », de « .. ») avant de remplacer les jetons.
+  Désinstallation refusée si l'appli est ouverte ou si c'est Cleanmac. Restes refusés si une appli
+  installée porte l'identifiant ; par prudence, Apple, les outils (Swift, Python…) et tout éditeur dont
+  une appli est installée sont écartés. Tout va à la Corbeille.
+- iCloud Drive : libérer n'est pas supprimer (le fichier reste dans iCloud) : pas de règle, mais même
+  rigueur (dans `~/Library/Mobile Documents`, aucun lien, entièrement envoyé) et chaque libération est
+  journalisée (méthode `evicted`).
+- Démarrage : seuls vos agents (`~/Library/LaunchAgents`) se modifient, de façon réversible
+  (`launchctl disable/enable`), jamais supprimés. Mises à jour : lecture seule.
+- Outil d'aide version 2 : commande `runMaintenanceScripts` retirée (`/usr/sbin/periodic` absent).
+- Confort : réglages `barreDesMenus`, `alerteEspace`, `seuilAlerteGo` (15 Go), `nettoyageProgramme`.
+  L'analyse programmée ne parcourt que les règles « sûres » et ne supprime jamais rien : elle notifie.
+- Tailles affichées toujours en unités françaises (« Go », « ko »).

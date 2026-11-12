@@ -45,7 +45,22 @@ struct DuplicatesScreen: View {
         .padding(.horizontal, 32)
         .padding(.bottom, 150)
         .sheet(isPresented: $showReview) {
-            DuplicateReviewSheet(model: model)
+            let selected = model.selectedCopies
+            CleanReviewSheet(
+                palette: Module.doublons.palette,
+                title: "Vérification avant la Corbeille",
+                totalBytes: model.selectedBytes,
+                sections: [ReviewSection(title: "Copies mises à la Corbeille", symbol: "trash", lines: selected.map { copy in
+                    ReviewLine(id: copy.file.path, name: DisplayPath.short(copy.file.path),
+                               detail: "garde : " + DisplayPath.short(model.keeper(of: copy.group) ?? ""),
+                               bytes: copy.file.mayShareBlocks ? 0 : copy.file.allocatedBytes, symbol: "checkmark.shield")
+                })],
+                notes: ["Juste avant, Cleanmac revérifie chaque copie : l'exemplaire gardé doit exister et avoir exactement le même contenu, sinon la copie est conservée. L'espace n'est libéré qu'une fois la Corbeille vidée."],
+                confirmTitle: "Mettre " + copies(selected.count) + " à la Corbeille",
+                phase: model.cleanState,
+                cleaningTitle: "Vérification et mise à la Corbeille…",
+                onConfirm: { model.trashSelection() },
+                onClose: { model.dismissCleanResult() })
         }
     }
 
@@ -265,126 +280,7 @@ private struct FileRow: View {
     }
 }
 
-/// Écran de vérification obligatoire avant de mettre des copies à la Corbeille.
-private struct DuplicateReviewSheet: View {
-    let model: DuplicatesModel
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            switch model.cleanState {
-            case let .cleaning(done, total):
-                Text("Vérification et mise à la Corbeille…").font(.title.bold())
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("\(done) sur \(total)").monospacedDigit().foregroundStyle(.secondary)
-            case let .finished(entry):
-                finished(entry)
-            case let .failed(message):
-                Text("L'opération a échoué").font(.title.bold())
-                Text(message).foregroundStyle(.red)
-                Button("Fermer") { model.dismissCleanResult(); dismiss() }
-            case .idle:
-                review
-            }
-        }
-        .padding(28)
-        .frame(width: 720)
-        .frame(minHeight: 420)
-        .controlSize(.large)
-        .interactiveDismissDisabled(model.isCleaning)
-    }
-
-    private var review: some View {
-        let selected = model.selectedCopies
-        return VStack(alignment: .leading, spacing: 18) {
-            Text("Vérification avant la Corbeille").font(.title.bold())
-            Text(Bytes.text(model.selectedBytes))
-                .font(.system(size: 44, weight: .bold).monospacedDigit())
-            Text(copies(selected.count).capitalizedFirst + " à mettre à la Corbeille. Pour chacune, l'exemplaire gardé est indiqué dessous.")
-                .font(.title3)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(selected, id: \.file.path) { copy in
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Label(DisplayPath.short(copy.file.path), systemImage: "trash")
-                                    .lineLimit(1).truncationMode(.head)
-                                Spacer()
-                                Text(copy.file.mayShareBlocks ? "copie APFS" : Bytes.text(copy.file.allocatedBytes))
-                                    .monospacedDigit().foregroundStyle(.secondary)
-                            }
-                            Label("garde : " + DisplayPath.short(model.keeper(of: copy.group) ?? ""), systemImage: "checkmark.shield")
-                                .lineLimit(1).truncationMode(.head)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .frame(maxHeight: 300)
-
-            Label("Juste avant, Cleanmac revérifie chaque copie : l'exemplaire gardé doit exister et avoir exactement le même contenu, sinon la copie est conservée. L'espace n'est libéré qu'une fois la Corbeille vidée.",
-                  systemImage: "info.circle")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack {
-                Button("Annuler", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("Mettre à la Corbeille") { model.trashSelection() }
-                    .keyboardShortcut(.defaultAction)
-                    .controlSize(.extraLarge)
-                    .disabled(selected.isEmpty)
-            }
-        }
-    }
-
-    private func finished(_ entry: JournalEntry) -> some View {
-        let failures = entry.items.filter { !$0.succeeded }
-        let trashed = entry.items.filter(\.succeeded)
-        return VStack(alignment: .leading, spacing: 16) {
-            Label(trashed.isEmpty ? "Aucune copie supprimée" : "Copies mises à la Corbeille",
-                  systemImage: trashed.isEmpty ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                .font(.title.bold())
-                .foregroundStyle(trashed.isEmpty ? .orange : .green)
-            Text(Bytes.text(entry.freedBytes))
-                .font(.system(size: 44, weight: .bold).monospacedDigit())
-            if !trashed.isEmpty {
-                Text((trashed.count == 1 ? "1 copie est" : "\(trashed.count) copies sont") + " dans la Corbeille. Videz-la pour libérer l'espace sur le disque.")
-                    .font(.title3)
-            }
-            if !failures.isEmpty {
-                Text((failures.count == 1 ? "1 copie a été conservée :" : "\(failures.count) copies ont été conservées :")).font(.title3.weight(.semibold))
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(failures, id: \.path) { item in
-                            Text("\((item.path as NSString).lastPathComponent) — \(item.message ?? "erreur")")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .frame(maxHeight: 160)
-            }
-            HStack {
-                if !trashed.isEmpty {
-                    Button("Ouvrir la Corbeille") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
-                    }
-                }
-                Spacer()
-                Button("Fermer") { model.dismissCleanResult(); dismiss() }
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-    }
-}
-
 /// « 1 copie », « 3 copies ».
 private func copies(_ count: Int) -> String {
     count == 1 ? "1 copie" : "\(count) copies"
-}
-
-private extension String {
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

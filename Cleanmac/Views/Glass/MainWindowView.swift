@@ -1,3 +1,4 @@
+import AppKit
 import CleanmacCore
 import SwiftUI
 
@@ -6,7 +7,7 @@ import SwiftUI
 struct MainWindowView: View {
     @Environment(AppModel.self) private var model
     @State private var module: Module = .analyse
-    @State private var showSettings = false
+    @Environment(\.openSettings) private var openSettings
 
     private var palette: ModulePalette { module.palette }
 
@@ -20,6 +21,10 @@ struct MainWindowView: View {
         switch module {
         case .carte: model.diskMap.isScanning
         case .doublons: model.duplicates.isScanning
+        case .icloud: model.icloud.isScanning
+        case .applications: model.apps.isLoading
+        case .purgeable: model.purgeable.isLoading
+        case .maintenance, .historique: false
         default: scanIsForModule && model.isScanning
         }
     }
@@ -29,7 +34,22 @@ struct MainWindowView: View {
         switch module {
         case .carte: model.diskMap.map != nil
         case .doublons: model.duplicates.scan != nil
+        case .icloud: model.icloud.scan != nil
+        case .applications: model.apps.hasLoaded
+        case .purgeable: model.purgeable.hasLoaded
+        case .maintenance, .historique: true
         default: resultForModule != nil
+        }
+    }
+
+    /// Un nettoyage du module est-il en cours ? (on ne relance pas l'analyse pendant ce temps)
+    private var moduleIsCleaning: Bool {
+        switch module {
+        case .doublons: model.duplicates.isCleaning
+        case .icloud: model.icloud.isCleaning
+        case .applications: model.apps.isCleaning
+        case .purgeable: model.purgeable.purging
+        default: model.isCleaning
         }
     }
     /// Avancement affiché sur l'objet en verre et le bouton rond.
@@ -38,13 +58,14 @@ struct MainWindowView: View {
         switch module {
         case .carte: return model.diskMap.estimatedFraction
         case .doublons: return model.duplicates.progress?.fractionCompleted
+        case .icloud, .applications, .purgeable: return nil
         default: return scanFraction
         }
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            Sidebar(selection: $module) { showSettings = true }
+            Sidebar(selection: $module) { openSettings() }
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -54,26 +75,15 @@ struct MainWindowView: View {
                 .transition(.opacity)
         }
         .overlay(alignment: .bottom) {
-            scanButton
-                .padding(.leading, Theme.Size.sidebarWidth)
-                .padding(.bottom, 10)
+            if module.hasScanButton {
+                scanButton
+                    .padding(.leading, Theme.Size.sidebarWidth)
+                    .padding(.bottom, 10)
+            }
         }
         .ignoresSafeArea(.container, edges: .top)
         .environment(\.colorScheme, .dark)
         .tint(palette.light)
-        .sheet(isPresented: $showSettings) {
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button("Fermer") { showSettings = false }
-                        .keyboardShortcut(.cancelAction)
-                        .controlSize(.large)
-                }
-                .padding([.top, .horizontal], 16)
-                FoundationsView()
-            }
-            .frame(minWidth: 860, minHeight: 680)
-        }
     }
 
     // MARK: Contenu
@@ -86,6 +96,21 @@ struct MainWindowView: View {
         } else if module == .doublons, let scan = model.duplicates.scan {
             DuplicatesScreen(scan: scan)
                 .id("doublons")
+        } else if module == .icloud, let scan = model.icloud.scan {
+            ICloudScreen(scan: scan)
+                .id("icloud")
+        } else if module == .applications, model.apps.hasLoaded {
+            AppsScreen()
+                .id("applications")
+        } else if module == .purgeable, model.purgeable.hasLoaded {
+            PurgeableScreen()
+                .id("purgeable")
+        } else if module == .maintenance {
+            MaintenanceScreen()
+                .id("maintenance")
+        } else if module == .historique {
+            HistoryScreen()
+                .id("historique")
         } else if let result = resultForModule {
             ResultsPanel(module: module, result: result)
                 .id("resultats-\(module.id)")
@@ -93,12 +118,12 @@ struct MainWindowView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 40) {
                     hero
-                    InfoPanel(module: module, isScanning: isScanningModule) { showSettings = true }
+                    InfoPanel(module: module, isScanning: isScanningModule) { openSettings() }
                         .frame(maxWidth: 440)
                 }
                 VStack(spacing: 8) {
                     hero.scaleEffect(0.72).frame(height: 310)
-                    InfoPanel(module: module, isScanning: isScanningModule) { showSettings = true }
+                    InfoPanel(module: module, isScanning: isScanningModule) { openSettings() }
                         .frame(maxWidth: 520)
                 }
             }
@@ -115,6 +140,8 @@ struct MainWindowView: View {
             Text(module.caption)
                 .font(Theme.Typo.caption)
                 .foregroundStyle(.white.opacity(0.72))
+                // La poubelle descend plus bas que les autres objets.
+                .padding(.top, module.hero == .trash ? 30 : 0)
         }
     }
 
@@ -127,17 +154,15 @@ struct MainWindowView: View {
 
     private var scanButton: some View {
         let busyElsewhere = module.scope != nil && model.isScanning && !scanIsForModule
+        let stoppable = module != .applications && module != .purgeable
         let title: String
         let enabled: Bool
-        if !module.isAvailable {
-            title = "Bientôt"
-            enabled = false
-        } else if isScanningModule {
-            title = "Arrêter"
-            enabled = true
+        if isScanningModule {
+            title = stoppable ? "Arrêter" : "Analyse…"
+            enabled = stoppable
         } else if moduleHasResult {
             title = "Relancer"
-            enabled = !model.isCleaning
+            enabled = !moduleIsCleaning
         } else {
             title = "Analyser"
             enabled = (module.scope == nil || model.rules != nil) && !busyElsewhere
@@ -153,13 +178,19 @@ struct MainWindowView: View {
                 if isScanningModule { model.diskMap.cancel() } else { model.diskMap.start() }
             } else if module == .doublons {
                 if isScanningModule { model.duplicates.cancel() } else { model.duplicates.start() }
+            } else if module == .icloud {
+                if isScanningModule { model.icloud.cancel() } else { model.icloud.start() }
+            } else if module == .applications {
+                model.apps.start()
+            } else if module == .purgeable {
+                model.purgeable.start()
             } else if isScanningModule {
                 model.cancelScan()
             } else {
                 model.startScan(categories: module.scope?.categories)
             }
         }
-        .accessibilityLabel(module.isAvailable ? "\(title) — \(module.title)" : "\(module.title) : module à venir")
+        .accessibilityLabel("\(title) — \(module.title)")
     }
 }
 
@@ -171,14 +202,21 @@ private struct Sidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            sectionTitle("Nettoyage")
-            ForEach(Module.cleaning) { row($0) }
-            sectionTitle("Espace et applis").padding(.top, 14)
-            ForEach(Module.spaceAndApps) { row($0) }
-            Spacer(minLength: 20)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    sectionTitle("Nettoyage")
+                    ForEach(Module.cleaning) { row($0) }
+                    sectionTitle("Espace et applis").padding(.top, 12)
+                    ForEach(Module.spaceAndApps) { row($0) }
+                    sectionTitle("Entretien").padding(.top, 12)
+                    ForEach(Module.care) { row($0) }
+                }
+            }
+            .scrollIndicators(.never)
+            Spacer(minLength: 8)
             DiskGauge()
             Button(action: openSettings) {
-                Label("Réglages et journal", systemImage: "gearshape")
+                Label("Réglages", systemImage: "gearshape")
                     .font(Theme.Typo.sidebar)
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(.vertical, 11)
@@ -223,14 +261,11 @@ private struct Sidebar: View {
                     .font(Theme.Typo.sidebar)
                     .fontWeight(selected ? .semibold : .medium)
                     .foregroundStyle(selected ? .white : .white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 4)
-                if !module.isAvailable {
-                    Text("bientôt")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
             }
-            .padding(.vertical, 11)
+            .padding(.vertical, 10)
             .padding(.horizontal, 12)
             .background {
                 if selected {
@@ -259,10 +294,13 @@ private struct DiskGauge: View {
         if let space = DiskSpace.current(), space.total > 0 {
             let used = 1 - Double(space.free) / Double(space.total)
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
+                HStack(alignment: .firstTextBaseline) {
                     Text("Macintosh HD")
-                    Spacer()
-                    Text("\(Bytes.text(space.free)) libres").monospacedDigit()
+                    Spacer(minLength: 4)
+                    Text("\(Bytes.text(space.free)) libres")
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.75))
@@ -333,9 +371,23 @@ private struct InfoPanel: View {
                                     failure: { if case let .failed(message) = model.duplicates.state { return message }; return nil }())
                     }
                     .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
-                } else if module.isAvailable {
+                } else if module == .corbeilles {
+                    VStack(alignment: .leading, spacing: 12) {
+                        PhotosTrashButton()
+                        statusLabel(cancelled: false, failure: nil)
+                    }
+                    .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
+                } else if module == .icloud {
+                    statusLabel(cancelled: { if case .cancelled = model.icloud.state { return true }; return false }(),
+                                failure: { if case let .failed(message) = model.icloud.state { return message }; return nil }())
+                        .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
+                } else if module == .purgeable {
+                    statusLabel(cancelled: false,
+                                failure: { if case let .failed(message) = model.purgeable.phase { return message }; return nil }())
+                        .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
+                } else if module.scope != nil {
                     Button(action: openSettings) {
-                        Text("Réglages de l'analyse")
+                        Text("Réglages du nettoyage")
                             .font(.system(size: 16, weight: .semibold))
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
@@ -344,11 +396,6 @@ private struct InfoPanel: View {
                     }
                     .buttonStyle(.plain)
                     .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
-                } else {
-                    Label("Ce module arrive dans une prochaine version.", systemImage: "hammer")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .modifier(Rise(appeared: appeared, delay: 0.8, reduceMotion: reduceMotion))
                 }
             }
         }
@@ -419,6 +466,28 @@ private struct InfoPanel: View {
                         .foregroundStyle(.white.opacity(0.7))
                 }
             }
+        } else if module == .icloud {
+            let progress = model.icloud.progress
+            VStack(alignment: .leading, spacing: 10) {
+                Text(progress.map { DisplayPath.short($0.currentPath) } ?? "Préparation…")
+                    .font(Theme.Typo.body)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(Bytes.text(progress?.bytesFound ?? 0))
+                    .font(.system(size: 54, weight: .bold).monospacedDigit())
+                    .contentTransition(.numericText())
+                Text("\((progress?.filesSeen ?? 0).formatted()) fichiers iCloud parcourus")
+                    .font(Theme.Typo.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        } else if module == .applications || module == .purgeable {
+            HStack(spacing: 12) {
+                ProgressView().controlSize(.large)
+                Text(module == .applications ? "Inventaire des applis et des restes…" : "Lecture des instantanés…")
+                    .font(Theme.Typo.body)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
         } else if case let .scanning(progress) = model.scanState {
             VStack(alignment: .leading, spacing: 10) {
                 Text(progress?.currentRuleName ?? "Préparation…")
@@ -465,8 +534,20 @@ private struct ResultsPanel: View {
             }
             .foregroundStyle(.white)
             ScrollView {
-                ResultsView(result: result)
-                    .padding(24)
+                VStack(alignment: .leading, spacing: 16) {
+                    if module == .corbeilles {
+                        HStack {
+                            Text("Photos garde ses photos supprimées 30 jours dans l'album « Supprimés récemment ». Cleanmac n'y touche pas (photothèque protégée) : videz-le depuis Photos.")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white.opacity(0.75))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                            PhotosTrashButton()
+                        }
+                    }
+                    ResultsView(result: result, palette: module.palette)
+                }
+                .padding(24)
             }
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.Size.panelCorner, style: .continuous))
             .overlay(
@@ -476,5 +557,25 @@ private struct ResultsPanel: View {
         .padding(.top, 48)
         .padding(.horizontal, 32)
         .padding(.bottom, 150)
+    }
+}
+
+/// Ouvre Photos (album « Supprimés récemment » à vider soi-même : la photothèque est protégée).
+struct PhotosTrashButton: View {
+    var body: some View {
+        Button {
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Photos") {
+                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            }
+        } label: {
+            Label("Ouvrir Photos", systemImage: "photo.on.rectangle")
+                .font(.system(size: 16, weight: .semibold))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.2), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help("Dans Photos : barre latérale › Supprimés récemment › Tout supprimer")
     }
 }

@@ -6,16 +6,26 @@ import SwiftUI
 struct ResultsView: View {
     @Environment(AppModel.self) private var model
     let result: ScanResult
+    let palette: ModulePalette
     @State private var showReview = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("\(Bytes.text(result.totalBytes)) trouvés")
-                .font(.title.bold())
-            Text("\(result.items.count) éléments, \(result.skipped.count) protégés, \(result.unreadableCount) illisibles — \(result.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated)))")
-                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(Bytes.text(result.totalBytes)) trouvés")
+                    .font(.system(size: 30, weight: .bold))
+                Spacer()
+            }
+            Text("\(plural(result.items.count, "élément")), \(plural(result.skipped.count, "protégé")), \(plural(result.unreadableCount, "illisible")) — \(result.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated)))")
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.7))
             ForEach(result.sourceErrors, id: \.self) { message in
                 Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+            if result.items.isEmpty {
+                Label("Rien à nettoyer ici.", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .padding(.vertical, 12)
             }
 
             ForEach(RuleCategory.allCases, id: \.self) { category in
@@ -23,41 +33,66 @@ struct ResultsView: View {
                 if !rules.isEmpty {
                     let bytes = rules.flatMap { result.items(forRule: $0.id) }.reduce(Int64(0)) { $0 + $1.allocatedBytes }
                     HStack {
-                        Text(category.title).font(.title2.weight(.semibold))
+                        Text(category.title).font(.system(size: 22, weight: .semibold))
                         Spacer()
-                        Text(Bytes.text(bytes)).font(.title2.monospacedDigit())
+                        Text(Bytes.text(bytes)).font(.system(size: 22).monospacedDigit())
                     }
                     .padding(.top, 8)
                     ForEach(rules) { rule in
-                        RuleGroup(rule: rule, items: result.items(forRule: rule.id))
+                        RuleGroup(rule: rule, items: result.items(forRule: rule.id), palette: palette)
                     }
                 }
             }
 
             selectionBar
         }
-        .sheet(isPresented: $showReview) {
-            ReviewSheet()
-        }
+        .foregroundStyle(.white)
+        .sheet(isPresented: $showReview) { review }
     }
 
     private var selectionBar: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading) {
-                Text("\(model.selectedItems.count) éléments cochés")
+                Text(plural(model.selectedItems.count, "élément coché", "éléments cochés"))
                     .font(.title3)
                 Text(Bytes.text(model.selectedBytes))
-                    .font(.title.bold().monospacedDigit())
+                    .font(.system(size: 28, weight: .bold).monospacedDigit())
             }
             Spacer()
-            Button("Vérifier et nettoyer…") { showReview = true }
-                .keyboardShortcut(.defaultAction)
-                .controlSize(.extraLarge)
-                .disabled(model.selectedItems.isEmpty || model.isCleaning)
+            PrimaryActionButton(title: "Vérifier et nettoyer…", symbol: "checkmark.shield", tint: palette.mid,
+                                enabled: !model.selectedItems.isEmpty && !model.isCleaning) { showReview = true }
         }
         .padding(18)
-        .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+        .background(palette.light.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.top, 8)
+    }
+
+    private var review: some View {
+        let items = model.selectedItems
+        let trash = items.filter { model.method(for: $0) == .trash }
+        let permanent = items.filter { model.method(for: $0) == .permanent }
+        let emptiesTrash = permanent.contains { model.rule(for: $0)?.inTrash == true }
+        func lines(_ list: [ScanItem]) -> [ReviewLine] {
+            list.sorted { $0.allocatedBytes > $1.allocatedBytes }.map {
+                ReviewLine(id: $0.path, name: $0.name, detail: model.rule(for: $0)?.name, bytes: $0.allocatedBytes, symbol: "tag")
+            }
+        }
+        var notes: [String] = []
+        if !trash.isEmpty {
+            notes.append("L'espace des éléments mis à la Corbeille n'est libéré qu'une fois la Corbeille vidée.")
+        }
+        return CleanReviewSheet(
+            palette: palette,
+            totalBytes: model.selectedBytes,
+            sections: [ReviewSection(title: "Mis à la Corbeille", symbol: "trash", lines: lines(trash)),
+                       ReviewSection(title: "Supprimés définitivement", symbol: "xmark.bin", lines: lines(permanent))],
+            notes: notes,
+            warning: emptiesTrash ? "Vider une Corbeille est définitif : ces éléments ne seront plus récupérables."
+                : permanent.isEmpty ? nil : "Les éléments « supprimés définitivement » ne passent pas par la Corbeille.",
+            confirmTitle: "Nettoyer \(Bytes.text(model.selectedBytes))",
+            phase: model.cleanState,
+            onConfirm: { model.cleanSelection() },
+            onClose: { model.dismissCleanResult() })
     }
 }
 
@@ -67,6 +102,7 @@ struct RuleGroup: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let rule: Rule
     let items: [ScanItem]
+    let palette: ModulePalette
     @State private var expanded = false
 
     private var sorted: [ScanItem] { items.sorted { $0.allocatedBytes > $1.allocatedBytes } }
@@ -75,99 +111,87 @@ struct RuleGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Button {
+            HStack(spacing: 8) {
+                GlassCheckbox(state: checkboxState, tint: palette.light, label: "Tout cocher pour \(rule.name)") {
                     model.setSelected(items, selectedCount < cleanable.count)
-                } label: {
-                    Image(systemName: checkboxSymbol)
-                        .font(.title2)
-                        .foregroundStyle(cleanable.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
                 }
-                .buttonStyle(.plain)
-                .disabled(cleanable.isEmpty)
-                .accessibilityLabel("Tout cocher pour \(rule.name)")
-
                 Button {
                     withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { expanded.toggle() }
                 } label: {
                     HStack {
                         Image(systemName: "chevron.right")
                             .rotationEffect(.degrees(expanded ? 90 : 0))
-                            .foregroundStyle(.secondary)
-                        Text(rule.name).font(.title3.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Text(rule.name).font(.system(size: 18, weight: .medium))
                         RiskBadge(risk: rule.risk)
+                        if rule.inTrash { Pill(text: "définitif", color: .orange) }
                         Spacer()
-                        Text("\(items.count)").foregroundStyle(.secondary)
+                        Text("\(items.count)").foregroundStyle(.white.opacity(0.6))
                         Text(Bytes.text(items.reduce(0) { $0 + $1.allocatedBytes }))
-                            .font(.title3.monospacedDigit())
+                            .font(.system(size: 18).monospacedDigit())
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint(expanded ? "Masquer les éléments" : "Afficher les éléments")
             }
 
             if expanded {
                 Text(rule.explanation)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 40)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 52)
                 if cleanable.isEmpty {
                     Label("Ces éléments ne peuvent pas aller à la Corbeille : activez la suppression définitive dans les réglages pour pouvoir les supprimer.",
                           systemImage: "info.circle")
                         .foregroundStyle(.orange)
-                        .padding(.leading, 40)
+                        .padding(.leading, 52)
                 }
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
                     ForEach(sorted.prefix(100)) { item in
-                        ItemRow(item: item)
+                        ItemRow(item: item, palette: palette)
                     }
                     if items.count > 100 {
-                        Text("… et \(items.count - 100) autres").foregroundStyle(.secondary)
+                        Text("… et \(items.count - 100) autres").foregroundStyle(.white.opacity(0.6))
                     }
                 }
-                .padding(.leading, 40)
+                .padding(.leading, 44)
             }
         }
-        .padding(14)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+        .padding(10)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private var checkboxSymbol: String {
-        if selectedCount == 0 { return "square" }
-        return selectedCount == cleanable.count ? "checkmark.square.fill" : "minus.square.fill"
+    private var checkboxState: GlassCheckbox.State {
+        if cleanable.isEmpty { return .locked }
+        if selectedCount == 0 { return .off }
+        return selectedCount == cleanable.count ? .on : .mixed
     }
 }
 
 struct ItemRow: View {
     @Environment(AppModel.self) private var model
     let item: ScanItem
+    let palette: ModulePalette
 
     var body: some View {
-        Button { model.toggle(item) } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: model.isSelected(item) ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(model.canClean(item) ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).lineLimit(1).truncationMode(.middle)
-                    if let detail = item.detail {
-                        Text(detail).font(.callout).foregroundStyle(.secondary)
-                    }
+        HStack(spacing: 8) {
+            GlassCheckbox(state: !model.canClean(item) ? .locked : model.isSelected(item) ? .on : .off,
+                          tint: palette.light, label: item.name) { model.toggle(item) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name).font(.system(size: 16)).lineLimit(1).truncationMode(.middle)
+                if let detail = item.detail {
+                    Text(detail).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                 }
-                Spacer()
-                Text(Bytes.text(item.allocatedBytes)).monospacedDigit()
             }
-            .font(.body)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!model.canClean(item))
-        .help(item.isExternal ? item.name : item.path)
-        .contextMenu {
+            Spacer()
+            Text(Bytes.text(item.allocatedBytes)).font(.system(size: 15).monospacedDigit())
             if !item.isExternal {
-                Button("Afficher dans le Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.path)])
-                }
+                FinderButton(path: item.path)
             }
         }
+        .help(item.isExternal ? item.name : item.path)
     }
 }
 
@@ -175,132 +199,6 @@ struct RiskBadge: View {
     let risk: RiskLevel
 
     var body: some View {
-        Text(risk.label)
-            .font(.callout)
-            .padding(.horizontal, 8).padding(.vertical, 2)
-            .background(Capsule().fill(risk == .safe ? Color.green.opacity(0.2) : Color.orange.opacity(0.2)))
-    }
-}
-
-/// Écran de vérification obligatoire avant tout nettoyage.
-struct ReviewSheet: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            switch model.cleanState {
-            case let .cleaning(done, total):
-                Text("Nettoyage en cours…").font(.title.bold())
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("\(done) sur \(total)").monospacedDigit().foregroundStyle(.secondary)
-            case let .finished(entry):
-                finished(entry)
-            case let .failed(message):
-                Text("Le nettoyage a échoué").font(.title.bold())
-                Text(message).foregroundStyle(.red)
-                Button("Fermer") { model.dismissCleanResult(); dismiss() }
-            case .idle:
-                review
-            }
-        }
-        .padding(28)
-        .frame(width: 680)
-        .frame(minHeight: 420)
-        .controlSize(.large)
-    }
-
-    private var trashItems: [ScanItem] { model.selectedItems.filter { model.method(for: $0) == .trash } }
-    private var permanentItems: [ScanItem] { model.selectedItems.filter { model.method(for: $0) == .permanent } }
-
-    private var review: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Vérification avant nettoyage").font(.title.bold())
-            Text(Bytes.text(model.selectedBytes))
-                .font(.system(size: 44, weight: .bold).monospacedDigit())
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if !trashItems.isEmpty {
-                        section("Mis à la Corbeille", symbol: "trash", items: trashItems)
-                    }
-                    if !permanentItems.isEmpty {
-                        section("Supprimés définitivement", symbol: "xmark.bin", items: permanentItems)
-                    }
-                }
-            }
-            .frame(maxHeight: 320)
-
-            if !trashItems.isEmpty {
-                Label("L'espace des éléments mis à la Corbeille n'est libéré qu'une fois la Corbeille vidée.",
-                      systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack {
-                Button("Annuler", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("Nettoyer \(Bytes.text(model.selectedBytes))") { model.cleanSelection() }
-                    .keyboardShortcut(.defaultAction)
-                    .controlSize(.extraLarge)
-            }
-        }
-    }
-
-    private func section(_ title: String, symbol: String, items: [ScanItem]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("\(title) — \(items.count) éléments, \(Bytes.text(items.reduce(0) { $0 + $1.allocatedBytes }))",
-                  systemImage: symbol)
-                .font(.title3.weight(.semibold))
-            ForEach(items.sorted { $0.allocatedBytes > $1.allocatedBytes }.prefix(30)) { item in
-                HStack {
-                    Text(item.name).lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                    Text(Bytes.text(item.allocatedBytes)).monospacedDigit().foregroundStyle(.secondary)
-                }
-            }
-            if items.count > 30 {
-                Text("… et \(items.count - 30) autres").foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func finished(_ entry: JournalEntry) -> some View {
-        let failures = entry.items.filter { !$0.succeeded }
-        let trashed = entry.items.filter { $0.succeeded && $0.method == .trash }
-        return VStack(alignment: .leading, spacing: 16) {
-            Label("Nettoyage terminé", systemImage: "checkmark.circle.fill")
-                .font(.title.bold())
-                .foregroundStyle(.green)
-            Text(Bytes.text(entry.freedBytes))
-                .font(.system(size: 44, weight: .bold).monospacedDigit())
-            if !trashed.isEmpty {
-                Text("\(trashed.count) éléments sont dans la Corbeille. Videz-la pour libérer l'espace sur le disque.")
-                    .font(.title3)
-            }
-            if !failures.isEmpty {
-                Text("\(failures.count) éléments n'ont pas été supprimés :").font(.title3.weight(.semibold))
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(failures, id: \.path) { item in
-                            Text("\((item.path as NSString).lastPathComponent) — \(item.message ?? "erreur")")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .frame(maxHeight: 160)
-            }
-            HStack {
-                if !trashed.isEmpty {
-                    Button("Ouvrir la Corbeille") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
-                    }
-                }
-                Spacer()
-                Button("Fermer") { model.dismissCleanResult(); dismiss() }
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
+        Pill(text: risk.label, color: risk == .safe ? .green : .orange)
     }
 }

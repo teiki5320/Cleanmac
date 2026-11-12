@@ -133,12 +133,16 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
     case icloud
     case carte
     case doublons
+    case purgeable
     case applications
+    case maintenance
+    case historique
 
     var id: String { rawValue }
 
     static let cleaning: [Module] = [.analyse, .systeme, .developpeur, .mail, .corbeilles, .icloud]
-    static let spaceAndApps: [Module] = [.carte, .doublons, .applications]
+    static let spaceAndApps: [Module] = [.carte, .doublons, .purgeable, .applications]
+    static let care: [Module] = [.maintenance, .historique]
 
     var title: String {
         switch self {
@@ -150,7 +154,10 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .icloud: "iCloud Drive"
         case .carte: "Carte du disque"
         case .doublons: "Doublons"
+        case .purgeable: "Espace purgeable"
         case .applications: "Applications"
+        case .maintenance: "Maintenance"
+        case .historique: "Historique"
         }
     }
 
@@ -165,7 +172,10 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .icloud: "icloud"
         case .carte: "chart.pie"
         case .doublons: "doc.on.doc"
+        case .purgeable: "externaldrive.badge.timemachine"
         case .applications: "square.grid.2x2"
+        case .maintenance: "wrench.and.screwdriver"
+        case .historique: "clock.arrow.circlepath"
         }
     }
 
@@ -187,15 +197,21 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
             ModulePalette(deep: Color(hex: 0x03132E), mid: Color(hex: 0x1D4ED8), light: Color(hex: 0x7DD3FC), accent: Color(hex: 0x6366F1))
         case .doublons:
             ModulePalette(deep: Color(hex: 0x1B0B33), mid: Color(hex: 0x7E22CE), light: Color(hex: 0xD8B4FE), accent: Color(hex: 0x2DD4BF))
+        case .purgeable:
+            ModulePalette(deep: Color(hex: 0x05202A), mid: Color(hex: 0x0E7490), light: Color(hex: 0x67E8F9), accent: Color(hex: 0x34D399))
         case .applications:
             ModulePalette(deep: Color(hex: 0x2D0A1E), mid: Color(hex: 0xBE185D), light: Color(hex: 0xF9A8D4), accent: Color(hex: 0xA855F7))
+        case .maintenance:
+            ModulePalette(deep: Color(hex: 0x1C1405), mid: Color(hex: 0xA16207), light: Color(hex: 0xFDE68A), accent: Color(hex: 0x84CC16))
+        case .historique:
+            ModulePalette(deep: Color(hex: 0x111827), mid: Color(hex: 0x475569), light: Color(hex: 0xCBD5E1), accent: Color(hex: 0x818CF8))
         }
     }
 
     var summary: String {
         switch self {
         case .analyse:
-            "Parcourt toutes les règles d'un coup : fichiers système et outils de développement, y compris les éléments « à vérifier ». Rien ne part sans votre vérification."
+            "Parcourt toutes les règles d'un coup : fichiers système, développement, Mail et Corbeilles, y compris les éléments « à vérifier ». Rien ne part sans votre vérification."
         case .systeme:
             "Caches des applications, journaux, rapports de plantage et états de fenêtres enregistrés."
         case .developpeur:
@@ -203,22 +219,28 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .mail:
             "Pièces jointes téléchargées par Mail et caches de Thunderbird."
         case .corbeilles:
-            "La Corbeille du Mac, celles des disques externes et celle de Photos, réunies au même endroit."
+            "La Corbeille du Mac et celles des disques externes, réunies au même endroit. Vider est définitif : rien n'est coché d'office. Pour Photos, Cleanmac ouvre l'album « Supprimés récemment »."
         case .icloud:
             "Libère les fichiers d'iCloud Drive téléchargés sur le Mac, sans les supprimer d'iCloud."
         case .doublons:
             "Retrouve les fichiers au contenu identique dans votre dossier personnel, suggère l'exemplaire à garder et met à la Corbeille les copies que vous cochez."
         case .carte:
             "Voyez ce qui prend la place, dossier par dossier : cliquez sur un anneau pour descendre, au centre pour remonter."
+        case .purgeable:
+            "L'espace que macOS garde en réserve : instantanés Time Machine locaux et fichiers qu'il peut libérer seul. Voyez ce qu'il représente et purgez les instantanés."
         case .applications:
-            "Désinstallez une appli avec tous ses fichiers, retrouvez les restes et gérez le démarrage."
+            "Désinstallez une appli avec tous ses fichiers, retrouvez les restes d'applis supprimées, gérez le démarrage et voyez les mises à jour."
+        case .maintenance:
+            "Petits soins du système : cache DNS, index Spotlight, services de lancement, mémoire vive. Et les applis qui en consomment le plus."
+        case .historique:
+            "Tout ce que Cleanmac a nettoyé, quand, et combien de place a été libérée."
         }
     }
 
     var features: [ModuleFeature] {
         switch self {
         case .analyse:
-            [.init(title: "Tous les fichiers système", symbol: "doc.text"),
+            [.init(title: "Fichiers système, Mail et Corbeilles", symbol: "doc.text"),
              .init(title: "Tout le développement", symbol: "hammer"),
              .init(title: "Vérification avant nettoyage", symbol: "checkmark.shield")]
         case .systeme:
@@ -249,10 +271,22 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
             [.init(title: "Comparaison du contenu, pas du nom", symbol: "number"),
              .init(title: "Vous choisissez l'exemplaire à garder", symbol: "checkmark.shield"),
              .init(title: "Copies à la Corbeille, revérifiées avant", symbol: "trash")]
+        case .purgeable:
+            [.init(title: "Instantanés Time Machine locaux", symbol: "clock.arrow.circlepath"),
+             .init(title: "Espace libre réel et purgeable", symbol: "internaldrive"),
+             .init(title: "Purge via l'outil d'aide", symbol: "lock.shield")]
         case .applications:
             [.init(title: "Désinstallation complète", symbol: "xmark.app"),
              .init(title: "Restes d'applis supprimées", symbol: "magnifyingglass"),
-             .init(title: "Éléments de démarrage", symbol: "power")]
+             .init(title: "Démarrage et mises à jour", symbol: "power")]
+        case .maintenance:
+            [.init(title: "Cache DNS et Spotlight", symbol: "network"),
+             .init(title: "Services de lancement", symbol: "arrow.triangle.2.circlepath"),
+             .init(title: "Mémoire vive", symbol: "memorychip")]
+        case .historique:
+            [.init(title: "Chaque nettoyage, en détail", symbol: "list.bullet"),
+             .init(title: "Total libéré", symbol: "sum"),
+             .init(title: "Retrouver un élément dans la Corbeille", symbol: "trash")]
         }
     }
 
@@ -261,33 +295,39 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .analyse: .orb
         case .developpeur: .code
         case .corbeilles: .trash
-        case .carte: .diskRing
+        case .carte, .purgeable: .diskRing
+        case .maintenance: .orb
         default: .block
         }
     }
 
-    /// Ce que le bouton d'analyse parcourt, ou `nil` si le module n'existe pas encore.
+    /// Règles parcourues par le bouton d'analyse (modules à règles uniquement).
     var scope: ScanScope? {
         switch self {
         case .analyse: .all
         case .systeme: .categories([.systemJunk])
         case .developpeur: .categories([.developer])
+        case .mail: .categories([.mail])
+        case .corbeilles: .categories([.trash])
         default: nil
         }
     }
 
-    /// Module utilisable (la carte du disque et les doublons n'ont pas de règles : ils ne nettoient rien).
-    var isAvailable: Bool { scope != nil || self == .carte || self == .doublons }
+    /// Le module a-t-il le gros bouton rond d'analyse ? (Maintenance et Historique s'affichent directement.)
+    var hasScanButton: Bool { self != .maintenance && self != .historique }
 
     /// Petite ligne sous l'objet en verre.
     var caption: String {
         switch self {
         case .analyse: "Toutes les règles, en une seule analyse"
-        case .systeme, .developpeur: "Les éléments « sûrs » sont cochés d'office"
-        case .mail, .corbeilles, .icloud: "Module à venir"
+        case .systeme, .developpeur, .mail: "Les éléments « sûrs » sont cochés d'office"
+        case .corbeilles: "Rien n'est coché d'office : vider est définitif"
+        case .icloud: "Fichiers de plus de 1 Mo, déjà envoyés dans iCloud"
         case .carte: "Taille en direct pendant l'analyse"
         case .doublons: "Fichiers de plus de 1 Mo, hors Bibliothèque"
-        case .applications: "Module à venir"
+        case .purgeable: "Disque de démarrage"
+        case .applications: "/Applications et ~/Applications"
+        case .maintenance, .historique: ""
         }
     }
 }

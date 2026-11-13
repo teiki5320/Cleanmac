@@ -208,13 +208,14 @@ private struct Sidebar: View {
                 VStack(alignment: .leading, spacing: 4) {
                     sectionTitle("Nettoyage")
                     ForEach(Module.cleaning) { row($0) }
-                    sectionTitle("Espace et applis").padding(.top, 12)
+                    sectionTitle("Espace et applis").padding(.top, 8)
                     ForEach(Module.spaceAndApps) { row($0) }
-                    sectionTitle("Soin du Mac").padding(.top, 12)
+                    sectionTitle("Soin du Mac").padding(.top, 8)
                     ForEach(Module.care) { row($0) }
                 }
             }
-            .scrollIndicators(.never)
+            // Sur une fenêtre basse, la liste défile : la barre de défilement le montre.
+            .scrollIndicators(.automatic)
             Spacer(minLength: 8)
             if model.fullDiskAccess != .granted {
                 Button {
@@ -237,7 +238,7 @@ private struct Sidebar: View {
                 Label("Réglages", systemImage: "gearshape")
                     .font(Theme.Typo.sidebar)
                     .foregroundStyle(.white.opacity(0.8))
-                    .padding(.vertical, 11)
+                    .padding(.vertical, 9)
                     .padding(.horizontal, 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
@@ -245,9 +246,9 @@ private struct Sidebar: View {
             .buttonStyle(.plain)
             .keyboardShortcut(",", modifiers: .command)
         }
-        .padding(.top, 52)
+        .padding(.top, 44)
         .padding(.horizontal, 14)
-        .padding(.bottom, 18)
+        .padding(.bottom, 14)
         .frame(width: Theme.Size.sidebarWidth)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(.black.opacity(0.16))
@@ -282,7 +283,7 @@ private struct Sidebar: View {
                     .lineLimit(1)
                 Spacer(minLength: 4)
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background {
                 if selected {

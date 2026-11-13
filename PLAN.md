@@ -9,10 +9,10 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - [x] Écran d'accueil au premier lancement : explication + bouton qui ouvre
       Réglages système › Confidentialité › Accès complet au disque, et détection de l'autorisation
       → codé, détection testée ; refait en style verre (0.7.0), rendu hors écran vérifié
-- [ ] Installation de l'outil d'aide privilégié (`SMAppService`) + XPC avec commandes autorisées
+- [x] Installation de l'outil d'aide privilégié (`SMAppService`) + XPC avec commandes autorisées
       → codé, paquet et signatures vérifiés ; reste à l'installer, l'autoriser dans
         Réglages système › Général › Ouverture et extensions, puis « Tester la connexion »
-        (Réglages › Accès). Seule étape qui demande l'utilisateur : macOS exige son autorisation.
+        (Réglages › Accès). Fait le 13 novembre 2026 : installé, autorisé, « répond (version 2) ».
 - [x] Moteur de règles : chargement de `Rules/*.json`, catégories, niveaux de risque
 - [x] Moteur de scan : parcours asynchrone, calcul des tailles réelles (espace alloué), annulation
 - [x] Moteur de nettoyage : Corbeille par défaut, journal, exclusions

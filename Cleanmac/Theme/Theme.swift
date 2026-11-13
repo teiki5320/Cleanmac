@@ -195,7 +195,8 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
     var palette: ModulePalette {
         switch self {
         case .analyse:
-            ModulePalette(deep: Color(hex: 0x03211F), mid: Color(hex: 0x0F766E), light: Color(hex: 0x5EEAD4), accent: Color(hex: 0x22D3EE))
+            // Magenta-rose propre à Cleanmac (voisin de l'esprit CleanMyMac, sans reprendre ses couleurs).
+            ModulePalette(deep: Color(hex: 0x2E0723), mid: Color(hex: 0xD0237A), light: Color(hex: 0xFBA5D0), accent: Color(hex: 0x9D4EDD))
         case .systeme:
             ModulePalette(deep: Color(hex: 0x0E1E08), mid: Color(hex: 0x4D7C0F), light: Color(hex: 0xBEF264), accent: Color(hex: 0x22C55E))
         case .developpeur:
@@ -213,7 +214,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .purgeable:
             ModulePalette(deep: Color(hex: 0x05202A), mid: Color(hex: 0x0E7490), light: Color(hex: 0x67E8F9), accent: Color(hex: 0x34D399))
         case .applications:
-            ModulePalette(deep: Color(hex: 0x2D0A1E), mid: Color(hex: 0xBE185D), light: Color(hex: 0xF9A8D4), accent: Color(hex: 0xA855F7))
+            ModulePalette(deep: Color(hex: 0x022C22), mid: Color(hex: 0x059669), light: Color(hex: 0x6EE7B7), accent: Color(hex: 0x22D3EE))
         case .maintenance:
             ModulePalette(deep: Color(hex: 0x1C1405), mid: Color(hex: 0xA16207), light: Color(hex: 0xFDE68A), accent: Color(hex: 0x84CC16))
         case .historique:

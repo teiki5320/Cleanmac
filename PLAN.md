@@ -225,5 +225,8 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
 - Version 0.8.0 (build 9).
 - Couleurs (13 novembre 2026) : « Analyse complète » passe en magenta-rose (0xD0237A), à la demande
   de l'utilisateur, dans l'esprit CleanMyMac mais avec des teintes propres ; « Applications » passe en
-  émeraude pour ne pas se confondre. À faire : logo (sphère de verre choisie, couleur à valider parmi
-  magenta, coucher de soleil, violet), puis l'intégrer comme icône de l'appli et dans la barre des menus.
+  émeraude pour ne pas se confondre. Logo : sphère de verre magenta, assortie à l'écran principal
+  (`Cleanmac/Assets.xcassets/AppIcon`, source dans `Design/logo-source.swift`). La barre des menus garde
+  le symbole « étincelles », repris du logo.
+- Doublons : la jauge avance selon les octets lus, y compris pendant la lecture complète des gros fichiers.
+- Version 0.8.1 (build 10).

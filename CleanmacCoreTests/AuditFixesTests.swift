@@ -169,3 +169,28 @@ struct AuditFixesTests {
         #expect(ContinuousClock.now - start < .seconds(5))
     }
 }
+
+@Suite("Progression des doublons")
+struct DuplicateProgressTests {
+    final class Log: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [Double] = []
+        func add(_ v: Double?) { if let v { lock.withLock { values.append(v) } } }
+        var all: [Double] { lock.withLock { values } }
+    }
+
+    @Test("La jauge avance pendant la lecture des gros fichiers et finit à 100 %")
+    func progressesThroughBigFiles() async throws {
+        let home = try FakeHome()
+        let size = 80 << 20
+        try home.file("a/gros.bin", bytes: size)
+        try home.file("b/gros.bin", bytes: size)
+        let log = Log()
+        _ = try await DuplicateFinder().find(in: [home.path], excluding: []) { log.add($0.fractionCompleted) }
+        let values = log.all
+        #expect(values.last == 1)
+        // Des valeurs intermédiaires pendant la lecture complète, toujours croissantes.
+        #expect(values.contains { $0 > 0.1 && $0 < 0.95 })
+        #expect(zip(values, values.dropFirst()).allSatisfy { $0 <= $1 })
+    }
+}

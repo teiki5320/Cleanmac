@@ -82,9 +82,14 @@ public struct DuplicateProgress: Sendable, Equatable {
     public var candidates: Int
     public var compared: Int
     public var currentPath: String
+    /// Octets à lire au plus (tous les candidats en entier) et déjà traités :
+    /// la jauge avance aussi pendant la lecture complète des gros fichiers.
+    public var bytesTotal: Int64 = 0
+    public var bytesDone: Int64 = 0
 
     public var fractionCompleted: Double? {
         guard phase == .comparing, candidates > 0 else { return nil }
+        if bytesTotal > 0 { return min(1, Double(bytesDone) / Double(bytesTotal)) }
         return Double(compared) / Double(candidates)
     }
 }
@@ -127,7 +132,9 @@ public struct DuplicateFinder: Sendable {
         var state = DuplicateProgress(
             phase: .comparing, filesSeen: inventory.seen,
             candidates: candidates.reduce(0) { $0 + $1.count }, compared: 0, currentPath: "")
+        state.bytesTotal = candidates.joined().reduce(Int64(0)) { $0 + $1.size }
         progress?(state)
+        let head = Int64(headBytes)
 
         var groups: [DuplicateGroup] = []
         var unreadable = inventory.unreadable
@@ -139,22 +146,36 @@ public struct DuplicateFinder: Sendable {
                 try Task.checkCancellation()
                 state.compared += 1
                 state.currentPath = entry.path
+                state.bytesDone += min(entry.size, head)
                 if state.compared % 50 == 0 { progress?(state) }
-                if let head = try Self.digest(entry.path, limit: headBytes) {
-                    byHead[head, default: []].append(entry)
+                if let digest = try Self.digest(entry.path, limit: headBytes) {
+                    byHead[digest, default: []].append(entry)
                 } else {
                     unreadable += 1
+                    state.bytesDone += max(0, entry.size - head)
                 }
+            }
+            // Fichiers sans jumeau au début : leur suite ne sera pas lue.
+            for alone in byHead.values where alone.count == 1 {
+                state.bytesDone += max(0, alone[0].size - head)
             }
             // 2. Empreinte complète, si le fichier dépasse le début déjà lu.
             for sameHead in byHead.values where sameHead.count > 1 {
                 var byFull: [String: [Entry]] = [:]
-                if sameHead[0].size <= Int64(headBytes) {
+                if sameHead[0].size <= head {
                     byFull[UUID().uuidString] = sameHead
                 } else {
                     for entry in sameHead {
                         try Task.checkCancellation()
-                        if let full = try Self.digest(entry.path, limit: nil) {
+                        let base = state.bytesDone
+                        state.currentPath = entry.path
+                        progress?(state)
+                        let full = try Self.digest(entry.path, limit: nil) { read in
+                            state.bytesDone = base + max(0, Int64(read) - head)
+                            progress?(state)
+                        }
+                        state.bytesDone = base + max(0, entry.size - head)
+                        if let full {
                             byFull[full, default: []].append(entry)
                         } else {
                             unreadable += 1
@@ -188,7 +209,8 @@ public struct DuplicateFinder: Sendable {
     }
 
     /// Empreinte SHA-256 des `limit` premiers octets (tout le fichier si `nil`) ; `nil` si illisible.
-    static func digest(_ path: String, limit: Int?) throws -> String? {
+    /// `onRead` reçoit régulièrement le nombre d'octets lus depuis le début (tous les 32 Mo).
+    static func digest(_ path: String, limit: Int?, onRead: ((Int) -> Void)? = nil) throws -> String? {
         let fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard fd >= 0 else { return nil }
         defer { close(fd) }
@@ -196,6 +218,8 @@ public struct DuplicateFinder: Sendable {
         let chunk = 1 << 20
         var buffer = [UInt8](repeating: 0, count: chunk)
         var remaining = limit ?? Int.max
+        var total = 0
+        var chunks = 0
         while remaining > 0 {
             try Task.checkCancellation()
             let wanted = min(chunk, remaining)
@@ -204,6 +228,9 @@ public struct DuplicateFinder: Sendable {
             if count == 0 { break }
             buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(count))) }
             remaining -= count
+            total += count
+            chunks += 1
+            if chunks % 32 == 0 { onRead?(total) }
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }

@@ -299,6 +299,7 @@ private struct Sidebar: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("module.\(module.rawValue)")
     }
 }
 

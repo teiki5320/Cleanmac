@@ -39,6 +39,7 @@ final class PurgeableModel {
     /// Purge les instantanés Time Machine locaux (via l'outil d'aide, en administrateur).
     func purge() {
         guard !purging else { return }
+        guard !TestMode.isActive else { message = TestMode.refusal; return }
         purging = true
         message = nil
         Task {
@@ -124,6 +125,7 @@ final class MaintenanceModel {
 
     func run(_ task: MaintenanceTask) {
         guard state(task) != .running else { return }
+        guard !TestMode.isActive else { states[task] = .failed(TestMode.refusal); return }
         states[task] = .running
         Task {
             if let command = task.helperCommand {

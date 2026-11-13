@@ -76,7 +76,7 @@ final class AppModel {
         apps.onCleaned = { [unowned self] in self.journalEntries = self.journal.entries() }
         comfort.rules = { [unowned self] in self.rules }
         comfort.exclusions = { ExclusionStore().load() }
-        comfort.start()
+        if !TestMode.isActive { comfort.start() }
     }
 
     // MARK: Exclusions
@@ -95,11 +95,13 @@ final class AppModel {
     }
 
     func addExclusion(_ path: String) {
+        guard !TestMode.isActive else { exclusionsError = TestMode.refusal; return }
         do { try ExclusionStore().add(path) } catch { exclusionsError = "Exclusion non enregistrée : \(error.localizedDescription)" }
         reloadExclusions()
     }
 
     func removeExclusion(_ path: String) {
+        guard !TestMode.isActive else { return }
         do { try ExclusionStore().remove(path) } catch { exclusionsError = "Exclusion non retirée : \(error.localizedDescription)" }
         reloadExclusions()
     }
@@ -115,6 +117,7 @@ final class AppModel {
 
     /// Remet à sa place un élément mis à la Corbeille.
     func restore(_ item: JournalItem) {
+        guard !TestMode.isActive else { restoreMessage = TestMode.refusal; return }
         do {
             _ = try TrashRestorer(journal: journal).restore(item)
             restoreMessage = "Remis en place : \(DisplayPath.short(item.path))"
@@ -218,7 +221,9 @@ final class AppModel {
             Cleaner(
                 rules: $0,
                 policy: ProtectionPolicy(userExclusions: exclusions),
-                journal: journal,
+                remover: TestMode.isActive ? RefusingRemover() : SystemFileRemover(),
+                journal: TestMode.isActive ? CleanJournal(fileURL: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("cleanmac-test-journal.json")) : journal,
                 allowPermanentDeletion: effectivePermanent)
         }
     }

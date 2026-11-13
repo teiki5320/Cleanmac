@@ -31,6 +31,7 @@ final class HelperManager {
     }
 
     func install() {
+        guard !TestMode.isActive else { message = TestMode.refusal; return }
         do {
             try service.register()
             message = "Outil d'aide installé."
@@ -44,6 +45,7 @@ final class HelperManager {
     }
 
     func uninstall() async {
+        guard !TestMode.isActive else { message = TestMode.refusal; return }
         isBusy = true
         defer { isBusy = false }
         do {

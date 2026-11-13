@@ -256,6 +256,7 @@ final class AppsModel {
 
     func setEnabled(_ enabled: Bool, _ item: LaunchItem) {
         guard launchBusy == nil else { return }
+        guard !TestMode.isActive else { launchMessage = TestMode.refusal; return }
         launchBusy = item.id
         Task {
             do {

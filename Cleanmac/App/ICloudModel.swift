@@ -76,6 +76,7 @@ final class ICloudModel {
     /// Libère les fichiers cochés (après l'écran de vérification).
     func evictSelection() {
         guard !isCleaning else { return }
+        guard !TestMode.isActive else { cleanState = .failed(TestMode.refusal); return }
         let files = selectedFiles.map { (path: $0.path, bytes: $0.allocatedBytes) }
         guard !files.isEmpty else { return }
         cleanState = .cleaning(done: 0, total: files.count)

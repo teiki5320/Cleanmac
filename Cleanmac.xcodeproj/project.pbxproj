@@ -36,6 +36,13 @@
 			remoteGlobalIDString = C1A000000000000000000041;
 			remoteInfo = CleanmacCore;
 		};
+		C1A0000000000000000000A6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C1A000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C1A000000000000000000040;
+			remoteInfo = Cleanmac;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -81,6 +88,7 @@
 		C1A000000000000000000031 /* CleanmacCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CleanmacCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C1A000000000000000000032 /* CleanmacCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanmacCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C1A000000000000000000033 /* CleanmacHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CleanmacHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1A000000000000000000034 /* CleanmacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanmacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -107,6 +115,11 @@
 		C1A000000000000000000014 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		C1A000000000000000000015 /* CleanmacUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CleanmacUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -142,6 +155,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C1A000000000000000000074 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -151,6 +171,7 @@
 				C1A000000000000000000010 /* Cleanmac */,
 				C1A000000000000000000011 /* CleanmacCore */,
 				C1A000000000000000000012 /* CleanmacCoreTests */,
+				C1A000000000000000000015 /* CleanmacUITests */,
 				C1A000000000000000000013 /* CleanmacHelper */,
 				C1A000000000000000000014 /* Shared */,
 				C1A000000000000000000004 /* Support */,
@@ -165,6 +186,7 @@
 				C1A000000000000000000031 /* CleanmacCore.framework */,
 				C1A000000000000000000032 /* CleanmacCoreTests.xctest */,
 				C1A000000000000000000033 /* CleanmacHelper */,
+				C1A000000000000000000034 /* CleanmacUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -268,6 +290,27 @@
 			productReference = C1A000000000000000000033 /* CleanmacHelper */;
 			productType = "com.apple.product-type.tool";
 		};
+		C1A000000000000000000044 /* CleanmacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1A0000000000000000000C0 /* Build configuration list for PBXNativeTarget "CleanmacUITests" */;
+			buildPhases = (
+				C1A000000000000000000073 /* Sources */,
+				C1A000000000000000000074 /* Frameworks */,
+				C1A000000000000000000075 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C1A0000000000000000000A7 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C1A000000000000000000015 /* CleanmacUITests */,
+			);
+			name = CleanmacUITests;
+			productName = CleanmacUITests;
+			productReference = C1A000000000000000000034 /* CleanmacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -290,6 +333,10 @@
 					C1A000000000000000000043 = {
 						CreatedOnToolsVersion = 27.2;
 					};
+					C1A000000000000000000044 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = C1A000000000000000000040;
+					};
 				};
 			};
 			buildConfigurationList = C1A0000000000000000000B0 /* Build configuration list for PBXProject "Cleanmac" */;
@@ -310,6 +357,7 @@
 				C1A000000000000000000041 /* CleanmacCore */,
 				C1A000000000000000000042 /* CleanmacCoreTests */,
 				C1A000000000000000000043 /* CleanmacHelper */,
+				C1A000000000000000000044 /* CleanmacUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -330,6 +378,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C1A000000000000000000072 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1A000000000000000000075 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -367,6 +422,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C1A000000000000000000073 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -385,6 +447,11 @@
 			target = C1A000000000000000000041 /* CleanmacCore */;
 			targetProxy = C1A0000000000000000000A4 /* PBXContainerItemProxy */;
 		};
+		C1A0000000000000000000A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C1A000000000000000000040 /* Cleanmac */;
+			targetProxy = C1A0000000000000000000A6 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -397,7 +464,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = K597U7X3FZ;
@@ -407,7 +474,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -425,7 +492,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = K597U7X3FZ;
@@ -434,7 +501,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -564,6 +631,28 @@
 			};
 			name = Release;
 		};
+		C1A0000000000000000000C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.teiki.cleanmac.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_TARGET_NAME = Cleanmac;
+			};
+			name = Debug;
+		};
+		C1A0000000000000000000C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.teiki.cleanmac.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_TARGET_NAME = Cleanmac;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -608,6 +697,15 @@
 			buildConfigurations = (
 				C1A0000000000000000000BD /* Debug */,
 				C1A0000000000000000000BE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C1A0000000000000000000C0 /* Build configuration list for PBXNativeTarget "CleanmacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C1A0000000000000000000C1 /* Debug */,
+				C1A0000000000000000000C2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

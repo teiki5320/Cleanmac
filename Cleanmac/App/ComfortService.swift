@@ -131,6 +131,7 @@ final class ComfortService {
     // MARK: Ouverture à la connexion
 
     func setLaunchAtLogin(_ enabled: Bool) {
+        guard !TestMode.isActive else { loginMessage = TestMode.refusal; return }
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             loginMessage = nil

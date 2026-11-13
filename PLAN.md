@@ -244,3 +244,13 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   avec `ditto`, retire la version de développement de LaunchServices et ouvre /Applications/Cleanmac.app.
   C'est désormais la façon de livrer une version testable. L'outil d'aide reste autorisé : macOS a
   rattaché son autorisation à /Applications/Cleanmac.app.
+- Tests d'interface (0.9.1) : cible `CleanmacUITests` et schéma du même nom (séparé des tests du moteur).
+  9 tests XCUITest pilotent la vraie appli : chaque module, analyse « Fichiers système » + écran de
+  vérification annulé, nettoyage confirmé refusé, Entretien, Historique, Applications (4 onglets),
+  Espace purgeable, Carte du disque, 5 onglets des Réglages. Lancés avec `CLEANMAC_UI_TEST=1` : le
+  « mode test » de l'appli refuse toute suppression, libération, remise en place, modification du
+  démarrage, tâche d'Entretien, exclusion, et écrit son journal dans un fichier temporaire.
+  Commande : `xcodebuild -project Cleanmac.xcodeproj -scheme CleanmacUITests test` (le mode
+  automatisation de macOS a été autorisé sans mot de passe par l'utilisateur, le 13 novembre 2026).
+  Sur macOS, le texte d'un `Text` SwiftUI est dans `value` (pas `label`) pour XCUITest.
+- Version 0.9.1 (build 12).

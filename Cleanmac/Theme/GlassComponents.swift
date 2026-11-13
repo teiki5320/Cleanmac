@@ -168,6 +168,7 @@ struct ScanButton: View {
                         .shadow(color: .black.opacity(0.45), radius: 20, y: 14)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("bouton-rond")
                 .keyboardShortcut(isDefaultAction ? .defaultAction : KeyboardShortcut("r", modifiers: .command))
                 .disabled(!enabled)
                 .opacity(enabled ? 1 : 0.55)

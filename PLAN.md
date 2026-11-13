@@ -239,3 +239,8 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
     Journalisé avec la méthode `restored` (déduit du total mis à la Corbeille).
   - Résultats : « Toujours ignorer » (main levée) ajoute l'élément aux exclusions et le retire de la liste.
 - Version 0.9.0 (build 11).
+- Installation (13 novembre 2026) : `scripts/installer.sh` compile en Release, vérifie la signature,
+  ferme Cleanmac, met l'ancienne version de /Applications à la Corbeille (jamais `rm`), copie la nouvelle
+  avec `ditto`, retire la version de développement de LaunchServices et ouvre /Applications/Cleanmac.app.
+  C'est désormais la façon de livrer une version testable. L'outil d'aide reste autorisé : macOS a
+  rattaché son autorisation à /Applications/Cleanmac.app.

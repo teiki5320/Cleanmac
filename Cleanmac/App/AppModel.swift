@@ -104,6 +104,35 @@ final class AppModel {
         reloadExclusions()
     }
 
+    // MARK: Remettre en place, toujours ignorer
+
+    /// Message de la dernière remise en place (affiché dans l'Historique).
+    private(set) var restoreMessage: String?
+
+    func canRestore(_ item: JournalItem) -> Bool {
+        TrashRestorer(journal: journal).canRestore(item)
+    }
+
+    /// Remet à sa place un élément mis à la Corbeille.
+    func restore(_ item: JournalItem) {
+        do {
+            _ = try TrashRestorer(journal: journal).restore(item)
+            restoreMessage = "Remis en place : \(DisplayPath.short(item.path))"
+        } catch {
+            restoreMessage = (error as? RestoreRefusal)?.description ?? error.localizedDescription
+        }
+        journalEntries = journal.entries()
+    }
+
+    /// Exclut définitivement un élément des analyses et le retire des résultats affichés.
+    func ignoreForever(_ item: ScanItem) {
+        guard !item.isExternal, !isCleaning else { return }
+        addExclusion(item.path)
+        guard exclusions.contains(item.path) else { return }
+        selection.remove(item.path)
+        if let result = scanResult { scanState = .finished(result.removing([item.path])) }
+    }
+
     func freezeSettingsForReview() { frozenPermanent = allowPermanentDeletion }
     func unfreezeSettings() { frozenPermanent = nil }
     private var effectivePermanent: Bool { frozenPermanent ?? allowPermanentDeletion }

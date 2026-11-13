@@ -73,6 +73,14 @@ public struct Scanner: Sendable {
     /// Nom lisible d'un dossier nommé par un identifiant (pièces jointes de Mail : « UUID/facture.pdf »).
     static func readableName(_ path: String) -> String? {
         let name = (path as NSString).lastPathComponent
+        // Sauvegarde d'iPhone ou d'iPad : nom de l'appareil et date (Info.plist de la sauvegarde).
+        if path.contains("/MobileSync/Backup/"),
+           let data = FileManager.default.contents(atPath: path + "/Info.plist"),
+           let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+           let device = info["Device Name"] as? String {
+            let date = (info["Last Backup Date"] as? Date).map { " — sauvegarde du " + $0.formatted(date: .abbreviated, time: .omitted) } ?? ""
+            return device + date
+        }
         guard UUID(uuidString: name) != nil, PathPattern.isRealDirectory(path) else { return nil }
         let children = ((try? FileManager.default.contentsOfDirectory(atPath: path)) ?? [])
             .filter { !$0.hasPrefix(".") }.sorted()

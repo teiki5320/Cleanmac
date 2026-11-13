@@ -8,7 +8,9 @@
       "risk": "safe",
       "regenerable": true,
       "explanation": "Fichiers temporaires que les applications recréent d'elles-mêmes au besoin. Les supprimer libère de la place sans perte de données.",
-      "paths": ["~/Library/Caches/*"],
+      "paths": [
+        "~/Library/Caches/*"
+      ],
       "excludes": [
         "~/Library/Caches/CloudKit",
         "~/Library/Caches/com.apple.bird",
@@ -22,8 +24,12 @@
       "category": "systemJunk",
       "risk": "safe",
       "explanation": "Historiques techniques écrits par les applications. Utiles seulement pour diagnostiquer un problème.",
-      "paths": ["~/Library/Logs/*"],
-      "excludes": ["~/Library/Logs/DiagnosticReports"]
+      "paths": [
+        "~/Library/Logs/*"
+      ],
+      "excludes": [
+        "~/Library/Logs/DiagnosticReports"
+      ]
     },
     {
       "id": "systeme.rapports-plantage",
@@ -31,7 +37,9 @@
       "category": "systemJunk",
       "risk": "safe",
       "explanation": "Rapports créés quand une application plante. Inutiles une fois le problème réglé.",
-      "paths": ["~/Library/Logs/DiagnosticReports/*"]
+      "paths": [
+        "~/Library/Logs/DiagnosticReports/*"
+      ]
     },
     {
       "id": "systeme.etat-applications",
@@ -39,7 +47,54 @@
       "category": "systemJunk",
       "risk": "review",
       "explanation": "Mémorise les fenêtres ouvertes de chaque application pour les rouvrir au lancement. Les supprimer ferme ces fenêtres au prochain démarrage.",
-      "paths": ["~/Library/Saved Application State/*"]
+      "paths": [
+        "~/Library/Saved Application State/*"
+      ]
+    },
+    {
+      "id": "systeme.caches-applis-app-store",
+      "name": "Caches des applis du Mac App Store",
+      "category": "systemJunk",
+      "risk": "safe",
+      "regenerable": true,
+      "explanation": "Caches rangés dans le conteneur de chaque appli téléchargée sur le Mac App Store. Recréés au besoin. Les applis d'Apple sont laissées de côté (leurs caches servent par exemple à l'analyse des photos, longue à refaire).",
+      "paths": [
+        "~/Library/Containers/*/Data/Library/Caches/*"
+      ],
+      "excludes": [
+        "~/Library/Containers/com.apple.*/Data/Library/Caches/*",
+        "~/Library/Containers/*/Data/Library/Caches/CloudKit"
+      ]
+    },
+    {
+      "id": "systeme.sauvegardes-ios",
+      "name": "Sauvegardes d'iPhone et d'iPad",
+      "category": "systemJunk",
+      "risk": "review",
+      "explanation": "Sauvegardes locales faites par le Finder (souvent plusieurs dizaines de Go chacune). À vérifier : supprimez seulement celles d'appareils que vous n'avez plus ou qui sont sauvegardés dans iCloud. Elles vont à la Corbeille.",
+      "paths": [
+        "~/Library/Application Support/MobileSync/Backup/*"
+      ]
+    },
+    {
+      "id": "systeme.installeurs-macos",
+      "name": "Installeurs de macOS",
+      "category": "systemJunk",
+      "risk": "review",
+      "explanation": "Applis « Installer macOS » téléchargées puis oubliées (12 à 15 Go chacune). Retéléchargeables depuis l'App Store ou Réglages système.",
+      "paths": [
+        "/Applications/Install macOS*.app"
+      ]
+    },
+    {
+      "id": "systeme.docker-disque",
+      "name": "Docker : disque virtuel",
+      "category": "systemJunk",
+      "risk": "review",
+      "explanation": "Disque virtuel de Docker Desktop : toutes les images, conteneurs et volumes. À vérifier : le supprimer efface tout ce qui est dans Docker. Préférez le nettoyage depuis Docker (docker system prune) si vous voulez garder vos conteneurs.",
+      "paths": [
+        "~/Library/Containers/com.docker.docker/Data/vms/*/data/Docker.raw"
+      ]
     }
   ]
 }

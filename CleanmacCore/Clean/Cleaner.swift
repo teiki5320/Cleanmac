@@ -294,7 +294,7 @@ public struct Cleaner: Sendable {
                     switch method {
                     case .trash: trashedPath = try remover.trash(request.path)
                     case .permanent: try remover.removePermanently(request.path)
-                    case .evicted: throw CleanRefusal.notMatchingRule(ruleID: rule.id)   // jamais par le nettoyeur
+                    case .evicted, .restored: throw CleanRefusal.notMatchingRule(ruleID: rule.id)   // jamais par le nettoyeur
                     }
                 } catch {
                     if let app = request.app, request.path.hasSuffix(".app") { keptApps.insert(app.bundleID) }

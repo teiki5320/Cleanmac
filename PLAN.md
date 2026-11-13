@@ -230,3 +230,12 @@ Ajouter en bas, dans « Décisions », tout choix important pris en cours de rou
   le symbole « étincelles », repris du logo.
 - Doublons : la jauge avance selon les octets lus, y compris pendant la lecture complète des gros fichiers.
 - Version 0.8.1 (build 10).
+- Améliorations (0.9.0) :
+  - Nouvelles règles « Fichiers système » : caches des applis du Mac App Store (conteneurs, hors applis
+    Apple dont les caches servent à l'analyse des photos) en « sûr » ; sauvegardes d'iPhone et d'iPad
+    (nom de l'appareil et date affichés), installeurs de macOS et disque virtuel de Docker en « à vérifier ».
+  - Historique : « Remettre en place » un élément mis à la Corbeille, s'il y est encore, si son
+    emplacement d'origine est libre et son dossier parent présent (rien n'est écrasé ni recréé).
+    Journalisé avec la méthode `restored` (déduit du total mis à la Corbeille).
+  - Résultats : « Toujours ignorer » (main levée) ajoute l'élément aux exclusions et le retire de la liste.
+- Version 0.9.0 (build 11).

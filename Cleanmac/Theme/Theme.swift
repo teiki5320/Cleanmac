@@ -227,7 +227,7 @@ enum Module: String, CaseIterable, Identifiable, Sendable {
         case .analyse:
             "Parcourt toutes les règles d'un coup : fichiers système, développement, Mail et Corbeilles, y compris les éléments « à vérifier ». Rien ne part sans votre vérification."
         case .systeme:
-            "Caches des applications, journaux, rapports de plantage et états de fenêtres enregistrés."
+            "Caches des applications (y compris celles du Mac App Store), journaux, rapports de plantage, sauvegardes d'iPhone et installeurs de macOS oubliés."
         case .developpeur:
             "Xcode, simulateurs, Gradle, Flutter, npm, Homebrew… Les modèles d'IA sont montrés mais jamais cochés d'office."
         case .mail:

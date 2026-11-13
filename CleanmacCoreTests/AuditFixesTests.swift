@@ -194,3 +194,57 @@ struct DuplicateProgressTests {
         #expect(zip(values, values.dropFirst()).allSatisfy { $0 <= $1 })
     }
 }
+
+@Suite("Remettre en place")
+struct RestoreTests {
+    func trashed(_ home: FakeHome, original: String) throws -> JournalItem {
+        let inTrash = try home.file(".Trash/" + (original as NSString).lastPathComponent, bytes: 100)
+        return JournalItem(path: original, ruleID: "systeme.caches-utilisateur", bytes: 100, method: .trash,
+                           succeeded: true, message: nil, trashedPath: inTrash)
+    }
+
+    @Test("Remet l'élément à sa place et l'inscrit au journal")
+    func restores() throws {
+        let home = try FakeHome()
+        try home.dir("Library/Caches")
+        let original = home.url("Library/Caches/com.exemple")
+        let item = try trashed(home, original: original)
+        let journal = CleanJournal(fileURL: URL(fileURLWithPath: home.url("j.json")))
+        let entry = try TrashRestorer(home: home.path, journal: journal).restore(item)
+        #expect(FileManager.default.fileExists(atPath: original))
+        #expect(!FileManager.default.fileExists(atPath: item.trashedPath!))
+        #expect(entry.items.first?.method == .restored)
+        #expect(entry.trashedBytes == -100 && entry.freedBytes == 0)
+        #expect(journal.entries().count == 1)
+    }
+
+    @Test("N'écrase jamais, ne recrée pas de dossier, refuse hors Corbeille")
+    func refuses() throws {
+        let home = try FakeHome()
+        let existing = try home.file("Library/Caches/pris", bytes: 1)
+        let restorer = TrashRestorer(home: home.path, journal: CleanJournal(fileURL: URL(fileURLWithPath: home.url("j.json"))))
+        #expect(throws: RestoreRefusal.originalExists) { try restorer.validate(try trashed(home, original: existing)) }
+        #expect(throws: RestoreRefusal.parentMissing) {
+            try restorer.validate(try trashed(home, original: home.url("Disparu/dossier/x")))
+        }
+        let outside = try home.file("Ailleurs/x", bytes: 1)
+        let fake = JournalItem(path: home.url("Library/Caches/y"), ruleID: "r", bytes: 1, method: .trash,
+                               succeeded: true, message: nil, trashedPath: outside)
+        #expect(throws: RestoreRefusal.notInTrash) { try restorer.validate(fake) }
+        let permanent = JournalItem(path: home.url("Library/Caches/z"), ruleID: "r", bytes: 1, method: .permanent,
+                                    succeeded: true, message: nil, trashedPath: nil)
+        #expect(throws: RestoreRefusal.notRestorable) { try restorer.validate(permanent) }
+    }
+
+    @Test("Nouvelles règles : caches App Store (hors Apple), sauvegardes iOS, installeurs, Docker")
+    func newRules() throws {
+        let book = try RuleBook.bundled()
+        let pattern = PathPattern(home: "/Users/x")
+        let caches = try #require(book.rule(id: "systeme.caches-applis-app-store"))
+        #expect(pattern.matches("/Users/x/Library/Containers/com.tiers.App/Data/Library/Caches/images", rule: caches))
+        #expect(!pattern.matches("/Users/x/Library/Containers/com.apple.mediaanalysisd/Data/Library/Caches/x", rule: caches))
+        for id in ["systeme.sauvegardes-ios", "systeme.installeurs-macos", "systeme.docker-disque"] {
+            #expect(book.rule(id: id)?.risk == .review, "règle \(id)")
+        }
+    }
+}

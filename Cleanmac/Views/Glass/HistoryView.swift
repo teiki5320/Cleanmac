@@ -15,6 +15,11 @@ struct HistoryScreen: View {
                 title: "Historique",
                 subtitle: entries.isEmpty ? "Aucun nettoyage pour l'instant"
                     : "\(plural(entries.count, "nettoyage")) — \(Bytes.text(model.totalReleased)) libérés tout de suite, \(Bytes.text(model.totalTrashed)) mis à la Corbeille")
+            if let message = model.restoreMessage {
+                Label(message, systemImage: "arrow.uturn.backward.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
             if entries.isEmpty {
                 EmptyStatePanel(symbol: "tray", title: "Rien encore",
                                 detail: "Chaque nettoyage, désinstallation ou libération iCloud apparaîtra ici, avec la date, les éléments et la place libérée.")
@@ -38,7 +43,7 @@ struct HistoryScreen: View {
 
     private func summary(_ entries: [JournalEntry]) -> some View {
         let items = entries.flatMap(\.items).filter(\.succeeded)
-        let trashed = items.filter { $0.method == .trash }.reduce(Int64(0)) { $0 + $1.bytes }
+        let trashed = entries.reduce(Int64(0)) { $0 + $1.trashedBytes }
         let permanent = items.filter { $0.method == .permanent }.reduce(Int64(0)) { $0 + $1.bytes }
         let evicted = items.filter { $0.method == .evicted }.reduce(Int64(0)) { $0 + $1.bytes }
         return HStack(spacing: 14) {
@@ -117,6 +122,7 @@ private struct EntryCard: View {
 }
 
 private struct ItemLine: View {
+    @Environment(AppModel.self) private var model
     let item: JournalItem
     let ruleName: String?
 
@@ -137,6 +143,11 @@ private struct ItemLine: View {
             Spacer()
             Text(Bytes.text(item.bytes)).font(.system(size: 14).monospacedDigit()).foregroundStyle(.white.opacity(0.7))
             if let trashed = item.trashedPath, FileManager.default.fileExists(atPath: trashed) {
+                if model.canRestore(item) {
+                    Button("Remettre en place") { model.restore(item) }
+                        .controlSize(.large)
+                        .accessibilityLabel("Remettre en place \(DisplayPath.short(item.path))")
+                }
                 FinderButton(path: trashed, title: "Afficher dans la Corbeille")
             }
         }
@@ -148,6 +159,7 @@ private struct ItemLine: View {
         case .trash: "trash"
         case .permanent: "xmark.bin"
         case .evicted: "icloud.and.arrow.up"
+        case .restored: "arrow.uturn.backward"
         }
     }
 }

@@ -6,12 +6,15 @@ public enum RemovalMethod: String, Codable, Sendable {
     case permanent
     /// Fichier iCloud libéré du Mac : il reste dans iCloud et se retélécharge à l'ouverture.
     case evicted
+    /// Élément remis à sa place depuis la Corbeille (annule une mise à la Corbeille).
+    case restored
 
     public var label: String {
         switch self {
         case .trash: "Mis à la Corbeille"
         case .permanent: "Supprimé définitivement"
         case .evicted: "Libéré du Mac, toujours dans iCloud"
+        case .restored: "Remis en place depuis la Corbeille"
         }
     }
 }
@@ -53,18 +56,24 @@ public struct JournalEntry: Codable, Sendable, Identifiable, Equatable {
 
     /// Tout ce qui a été traité (Corbeille, définitif, iCloud).
     public var freedBytes: Int64 {
-        items.filter(\.succeeded).reduce(0) { $0 + $1.bytes }
+        items.filter { $0.succeeded && $0.method != .restored }.reduce(0) { $0 + $1.bytes }
     }
 
     /// Place vraiment libérée tout de suite : suppressions définitives et fichiers iCloud libérés.
     /// (Ce qui va à la Corbeille ne libère rien tant qu'elle n'est pas vidée.)
     public var releasedBytes: Int64 {
-        items.filter { $0.succeeded && $0.method != .trash }.reduce(0) { $0 + $1.bytes }
+        items.filter { $0.succeeded && ($0.method == .permanent || $0.method == .evicted) }.reduce(0) { $0 + $1.bytes }
     }
 
-    /// Mis à la Corbeille.
+    /// Mis à la Corbeille, moins ce qui en a été remis en place.
     public var trashedBytes: Int64 {
-        items.filter { $0.succeeded && $0.method == .trash }.reduce(0) { $0 + $1.bytes }
+        items.filter(\.succeeded).reduce(0) { total, item in
+            switch item.method {
+            case .trash: total + item.bytes
+            case .restored: total - item.bytes
+            default: total
+            }
+        }
     }
 }
 

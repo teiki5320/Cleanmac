@@ -19,6 +19,10 @@ struct ResultsView: View {
             Text("\(plural(result.items.count, "élément")), \(plural(result.skipped.count, "protégé")), \(plural(result.unreadableCount, "illisible")) — \(result.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated)))")
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.7))
+            Label("Le dossier montre l'élément dans le Finder ; la main levée l'ignore pour toujours (Réglages › Exclusions).",
+                  systemImage: "hand.raised")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.65))
             ForEach(result.sourceErrors, id: \.self) { message in
                 Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
@@ -194,6 +198,18 @@ struct ItemRow: View {
             Text(Bytes.text(item.allocatedBytes)).font(.system(size: 15).monospacedDigit())
             if !item.isExternal {
                 FinderButton(path: item.path)
+                Button {
+                    model.ignoreForever(item)
+                } label: {
+                    Image(systemName: "hand.raised")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .background(.white.opacity(0.1), in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Toujours ignorer : ajouté aux exclusions (Réglages › Exclusions)")
+                .accessibilityLabel("Toujours ignorer \(item.name)")
             }
         }
         .help(item.isExternal ? item.name : item.path)
